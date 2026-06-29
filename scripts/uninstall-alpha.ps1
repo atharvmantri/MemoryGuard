@@ -74,13 +74,29 @@ if ($removed -eq 0) {
     Write-Host "  (If you installed with a custom -InstallDir, pass the same path here.)"
 }
 
-# PATH note
+# Remove the install dir from the user PATH if we (or a previous install
+# of this installer) added it there. The current session PATH is left alone:
+# removing it from $env:Path would not change anything visible to this
+# shell, and other shells in flight have their own PATH.
+Write-Step "PATH"
 $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($userPath -and ($userPath -split ";" | Where-Object { $_ -ieq $InstallDir })) {
-    Write-Step "PATH"
-    Write-Host "  $InstallDir is still listed in your user PATH."
-    Write-Host "  Remove it manually if you no longer want it on PATH:"
-    Write-Host "    [Environment]::SetEnvironmentVariable('Path', (([Environment]::GetEnvironmentVariable('Path','User')).Split(';') | Where-Object { \$_ -ine '$InstallDir' }) -join ';', 'User')"
+if ($userPath) {
+    $parts = $userPath -split ";" | Where-Object { $_ -and ($_ -ine $InstallDir) }
+    $newPath = ($parts -join ";")
+    if ($newPath -ne $userPath) {
+        try {
+            [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
+            Write-Ok "removed $InstallDir from the persistent user PATH"
+        } catch {
+            Write-Warn "could not update the user PATH automatically: $_"
+            Write-Host "    To remove it manually:"
+            Write-Host "      [Environment]::SetEnvironmentVariable('Path', '$newPath', 'User')"
+        }
+    } else {
+        Write-Host "  [skip] $InstallDir was not on the persistent user PATH"
+    }
+} else {
+    Write-Host "  [skip] user PATH was empty; nothing to remove"
 }
 
 Write-Step "Uninstalled"

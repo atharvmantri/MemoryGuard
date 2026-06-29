@@ -12,16 +12,49 @@
 #   2. Verifies `uv` is on PATH; otherwise prints install instructions and exits.
 #   3. Runs `uv sync --dev` to install Python dependencies (idempotent).
 #   4. Writes ~/.local/bin/memoryguard and marks it executable.
-#   5. Reports whether ~/.local/bin is on the user PATH and how to add it.
+#   5. Detects any pre-existing `memoryguard` collision on the current PATH
+#      that would shadow the new wrapper and prints a clear warning naming
+#      the blocking file and its location.
+#   6. By default, prepends the install dir to the user PATH (writing to
+#      ~/.bashrc, ~/.zshrc, or ~/.profile as appropriate) and to the current
+#      session's PATH so the new wrapper resolves immediately. Pass
+#      `--no-path-update` to skip both PATH writes.
+#   7. Smoke-tests the actual `memoryguard` command (not `uv run memoryguard`)
+#      to confirm PATH resolution picks up the freshly installed wrapper.
 #
 # This script is local-first and does not publish or install PyPI/npm packages.
 
 set -euo pipefail
 
+NO_PATH_UPDATE=0
 FORCE=0
-if [[ "${1:-}" == "--force" || "${1:-}" == "-f" ]]; then
-    FORCE=1
-fi
+INSTALL_DIR="${MEMORYGUARD_INSTALL_DIR:-$HOME/.local/bin}"
+POSITIONAL=()
+for arg in "$@"; do
+    case "$arg" in
+        --no-path-update)
+            NO_PATH_UPDATE=1
+            ;;
+        --force|-f)
+            FORCE=1
+            ;;
+        --help|-h)
+            cat <<USAGE
+Usage: bash scripts/install-alpha.sh [--no-path-update] [--force]
+
+Options:
+  --no-path-update   Do not modify the user PATH or the current session PATH.
+                     Only the wrapper file is written.
+  --force            Reserved; current installer is idempotent.
+  -h, --help         Show this help.
+USAGE
+            exit 0
+            ;;
+        *)
+            POSITIONAL+=("$arg")
+            ;;
+    esac
+done
 
 # ---------------------------------------------------------------------------
 # Locate the MemoryGuard repo root
@@ -66,18 +99,59 @@ echo "  [ok] uv $(uv --version) found"
 # ---------------------------------------------------------------------------
 
 echo
-echo "==> Running uv sync --dev (this may take a moment on first run)"
+echo "==> Running uv sync --all-packages --dev (this may take a moment on first run)"
 (
     cd "$REPO_ROOT"
-    uv sync --dev
+    uv sync --all-packages --dev
 )
 echo "  [ok] Python dependencies installed"
+
+# ---------------------------------------------------------------------------
+# Detect pre-existing memoryguard collisions on PATH (BEFORE we write ours)
+# ---------------------------------------------------------------------------
+
+echo
+echo "==> Scanning PATH for existing memoryguard files"
+
+collision_found=0
+collisions=""
+# Iterate each PATH dir, looking for any file named `memoryguard` (with or
+# without a suffix). Skip our own install dir.
+IFS=':' read -ra _path_dirs <<< "$PATH"
+for d in "${_path_dirs[@]}"; do
+    [[ -z "$d" ]] && continue
+    # Normalize trailing slashes.
+    d="${d%/}"
+    [[ "$d" == "$INSTALL_DIR" ]] && continue
+    for name in memoryguard memoryguard.bin memoryguard.exe memoryguard.sh; do
+        if [[ -e "$d/$name" ]]; then
+            echo "  [warn] found pre-existing $d/$name on PATH"
+            collisions="${collisions}${collisions:+$'\n'}    - $d/$name"
+            collision_found=1
+        fi
+    done
+done
+
+if [[ "$collision_found" -eq 1 ]]; then
+    echo
+    echo "  A pre-existing \`memoryguard\` will shadow the alpha wrapper."
+    echo "  The first match on PATH wins. To make the alpha wrapper take over:"
+    echo "    1. The new wrapper is at: $INSTALL_DIR/memoryguard"
+    echo "    2. Either delete or rename the files above, OR"
+    echo "    3. Make sure $INSTALL_DIR appears before every conflicting"
+    echo "       directory in PATH (this installer will do that below if you"
+    echo "       let it update PATH)."
+    echo
+else
+    echo "  [ok] no pre-existing memoryguard files on PATH"
+fi
 
 # ---------------------------------------------------------------------------
 # Write the wrapper
 # ---------------------------------------------------------------------------
 
-INSTALL_DIR="${MEMORYGUARD_INSTALL_DIR:-$HOME/.local/bin}"
+echo
+echo "==> Writing wrapper"
 WRAPPER="$INSTALL_DIR/memoryguard"
 
 mkdir -p "$INSTALL_DIR"
@@ -94,45 +168,116 @@ chmod +x "$WRAPPER"
 echo "  [ok] wrote $WRAPPER"
 
 # ---------------------------------------------------------------------------
-# PATH guidance
+# PATH: persistent user PATH + current session PATH
 # ---------------------------------------------------------------------------
 
 echo
 echo "==> PATH"
 
-case ":${PATH}:" in
-    *":$INSTALL_DIR:"*)
-        echo "  [ok] $INSTALL_DIR is already on your PATH"
-        ;;
-    *)
-        echo "  [warn] $INSTALL_DIR is not on your PATH"
-        echo
-        echo "  Add it for this shell session:"
-        echo "    export PATH=\"$INSTALL_DIR:\$PATH\""
-        echo
-        echo "  Add it permanently (e.g. in ~/.bashrc, ~/.zshrc, or ~/.profile):"
-        echo "    echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.bashrc"
-        echo
-        if [[ -n "${BASH_VERSION:-}" ]]; then
+# Normalize INSTALL_DIR for membership checks.
+_normalized_install_dir="${INSTALL_DIR%/}"
+
+_session_has_install=0
+IFS=':' read -ra _session_dirs <<< "$PATH"
+for d in "${_session_dirs[@]}"; do
+    d="${d%/}"
+    if [[ "$d" == "$_normalized_install_dir" ]]; then
+        _session_has_install=1
+        break
+    fi
+done
+
+if [[ "$NO_PATH_UPDATE" -eq 1 ]]; then
+    echo "  [warn] --no-path-update was set; skipping user PATH and session PATH changes."
+    if [[ "$_session_has_install" -eq 0 ]]; then
+        echo "    Note: $INSTALL_DIR is not on PATH; \`memoryguard\` will not resolve in this shell."
+    else
+        echo "  [ok] $INSTALL_DIR is already on PATH"
+    fi
+else
+    # 1. Persistent user PATH: pick the right rc file for this shell.
+    if [[ "$_session_has_install" -eq 1 ]]; then
+        echo "  [ok] $INSTALL_DIR is already on the current session PATH"
+    else
+        export PATH="$_normalized_install_dir:$PATH"
+        echo "  [ok] added $INSTALL_DIR to the current session PATH (no new shell needed)"
+    fi
+
+    # 2. Persistent user PATH: append a single guarded export line to the
+    #    most appropriate rc file. Skip if it is already there.
+    _rc_file=""
+    case "${SHELL:-}" in
+        */zsh)
+            _rc_file="$HOME/.zshrc"
+            ;;
+        */bash|*)
             if [[ -f "$HOME/.bashrc" ]]; then
-                echo "  Detected ~/.bashrc — a one-shot command you can paste:"
-                echo "    echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.bashrc && source ~/.bashrc"
+                _rc_file="$HOME/.bashrc"
+            elif [[ -f "$HOME/.bash_profile" ]]; then
+                _rc_file="$HOME/.bash_profile"
+            elif [[ -f "$HOME/.profile" ]]; then
+                _rc_file="$HOME/.profile"
+            else
+                _rc_file="$HOME/.profile"
+                touch "$_rc_file"
             fi
+            ;;
+    esac
+    if [[ -z "$_rc_file" ]]; then
+        echo "  [warn] could not detect a shell rc file; not editing any rc"
+    else
+        # Guard line so re-running the installer does not stack duplicates.
+        _guard="# memoryguard alpha wrapper (managed by scripts/install-alpha.sh)"
+        if grep -F "$_guard" "$_rc_file" >/dev/null 2>&1; then
+            echo "  [ok] $_rc_file already has the memoryguard PATH entry"
+        else
+            {
+                echo ""
+                echo "$_guard"
+                echo "if [[ \":\${PATH}:\" != *\":$_normalized_install_dir:\"* ]]; then"
+                echo "    export PATH=\"$_normalized_install_dir:\$PATH\""
+                echo "fi"
+            } >> "$_rc_file"
+            echo "  [ok] added $INSTALL_DIR to $_rc_file (open a new shell or 'source' it)"
         fi
-        ;;
-esac
+    fi
+fi
 
 # ---------------------------------------------------------------------------
-# Smoke test
+# Smoke test: invoke the actual wrapper command, not `uv run memoryguard`
 # ---------------------------------------------------------------------------
 
 echo
 echo "==> Smoke test"
 if ! (cd "$REPO_ROOT" && uv run memoryguard --help >/dev/null 2>&1); then
-    echo "  [error] uv run memoryguard --help failed; the wrapper will not work." >&2
+    echo "  [error] uv run memoryguard --help failed; the wrapper would not work either." >&2
     exit 1
 fi
 echo "  [ok] uv run memoryguard --help responds"
+
+# Now resolve the wrapper itself, the way a user would type it.
+if command -v memoryguard >/dev/null 2>&1; then
+    resolved_path="$(command -v memoryguard)"
+    expected="$INSTALL_DIR/memoryguard"
+    if [[ "$resolved_path" == "$expected" ]]; then
+        echo "  [ok] wrapper resolves to: $resolved_path"
+    else
+        echo "  [warn] wrapper resolves to $resolved_path (expected $expected)"
+        echo "         A different \`memoryguard\` on PATH is shadowing the new install."
+        echo "         See the collision list above for the file that needs to be removed or renamed."
+    fi
+    if memoryguard --help >/dev/null 2>&1; then
+        echo "  [ok] wrapper at $resolved_path responds to --help"
+    else
+        echo "  [warn] wrapper at $resolved_path exited non-zero on --help"
+    fi
+else
+    if [[ "$NO_PATH_UPDATE" -eq 1 ]]; then
+        echo "  [warn] \`memoryguard\` is not on PATH (--no-path-update was set); skipping wrapper smoke test"
+    else
+        echo "  [warn] \`memoryguard\` is not on PATH yet; open a new shell or 'source' your rc"
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # Done
