@@ -1,0 +1,48 @@
+/*
+ * MemoryGuard — Vault Mesh brand tokens (source of truth for the OSS dashboard).
+ *
+ * Mirrors design.md "Frontend & Dashboard Design (Brand: Vault Mesh)" →
+ * "Brand Tokens" block, and Requirement 19.1. Component CSS lives in brand.css
+ * and consumes only these variables so the palette stays centralized.
+ */
+:root {
+  /* --- Brand palette (Vault Mesh) --------------------------------------- */
+  --vault-charcoal: #22323f; /* primary background / surfaces */
+  --circuit-blue: #1db2f5; /* primary action / links / trust-high accent */
+  --metal-silver: #b8c1c8; /* secondary text / borders */
+  --signal-lime: #c9e71e; /* highlights / verified / CTA accent */
+  --white: #ffffff; /* text on dark / cards */
+
+  /* --- Surface aliases --------------------------------------------------- */
+  --surface-base: var(--vault-charcoal); /* app background */
+  --surface-raised: #2b3d4b; /* cards / panels on the charcoal base */
+  --surface-overlay: rgba(255, 255, 255, 0.04); /* subtle card tint */
+  --surface-inverse: var(--white); /* light surfaces (header) */
+  --border-subtle: rgba(184, 193, 200, 0.25); /* metal-silver @ 25% */
+  --border-strong: var(--metal-silver);
+
+  /* --- Text aliases ------------------------------------------------------ */
+  --text-primary: var(--white); /* default text on dark surfaces */
+  --text-secondary: var(--metal-silver); /* muted / secondary text */
+  --text-on-light: var(--vault-charcoal); /* text on light surfaces */
+  --text-link: var(--circuit-blue);
+  --text-accent: var(--signal-lime);
+
+  /* --- Trust-meter semantic colors -------------------------------------- */
+  /* high uses brand accents, medium amber, low red (Requirement 19.3) */
+  --trust-high: var(--circuit-blue);
+  --trust-high-accent: var(--signal-lime);
+  --trust-medium: #f5a623; /* amber */
+  --trust-low: #e5484d; /* red */
+
+  /* --- Warning / contradiction indicator -------------------------------- */
+  --warning: #f5a623;
+  --warning-strong: #e5484d;
+  --warning-surface: rgba(229, 72, 77, 0.15);
+
+  /* --- Spacing, radius & typography primitives -------------------------- */
+  --mg-radius: 8px;
+  --mg-gap: 12px;
+  --mg-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+}

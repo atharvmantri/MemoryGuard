@@ -1,0 +1,85 @@
+# ---------------------------------------------------------------------------
+# MemoryGuard — root .gitignore
+#
+# Excludes build artifacts, caches, local stores, and secrets from the
+# published open-core repository. Keep this list in sync with the
+# "Repository hygiene" section of OSS_PUBLICATION_CHECKLIST.md.
+# ---------------------------------------------------------------------------
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+*.so
+.Python
+
+# Python virtual environments
+.venv/
+.uv-test-env/
+.uv-test-venv/
+venv/
+env/
+ENV/
+
+# Python tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+*/__pycache__/
+
+# --- Node / TypeScript ---
+node_modules/
+.next/
+apps/web/.next/
+out/
+*.tsbuildinfo
+.turbo/
+coverage/
+
+# --- MemoryGuard local stores & data ---
+.memoryguard/
+.tmpctx/
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
+# --- Secrets & environment ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+/secrets.*
+/credentials.*
+
+# --- Editor / OS ---
+.DS_Store
+Thumbs.db
+*.swp
+*~
+*.log
+logs/
+tmp/
+temp/
+
+# Keep IDE workspace settings local (not published).
+.vscode/
+.idea/
+.kiro/
+
+# --- Private / non-public docs (strategy, PRDs) ---
+docs/private/
+*-PRD.pdf

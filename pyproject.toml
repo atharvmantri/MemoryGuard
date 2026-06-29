@@ -1,0 +1,41 @@
+[project]
+name = "memoryguard-oss-alpha-workspace"
+version = "0.1.0"
+description = "MemoryGuard OSS alpha workspace."
+requires-python = ">=3.11"
+readme = "README.md"
+license = "Apache-2.0"
+dependencies = [
+    "memoryguard-core",
+    "memoryguard-cli",
+    "memoryguard",
+    "memoryguard-mcp-server",
+    "memoryguard-models",
+]
+
+[tool.uv.workspace]
+members = [
+    "packages/core",
+    "packages/cli",
+    "packages/sdk-python",
+    "packages/mcp-server",
+    "packages/models",
+]
+
+[tool.uv.sources]
+memoryguard-core = { workspace = true }
+memoryguard-cli = { workspace = true }
+memoryguard = { workspace = true }
+memoryguard-mcp-server = { workspace = true }
+memoryguard-models = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100

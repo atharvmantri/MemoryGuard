@@ -1,0 +1,14 @@
+User: The README still says the backend was planned around FastAPI.
+Assistant: I found old FastAPI scaffolding in the notes.
+User: We moved from FastAPI to Flask.
+Assistant: I will update the route examples around Flask.
+User: Use pnpm instead of npm.
+Assistant: Local dev uses SQLite but production uses PostgreSQL.
+User: Deploy this on Vercel.
+Assistant: Tests run with pnpm test.
+User: Frontend is React.
+Assistant: Do not add external LLM API dependencies.
+User: Maybe try Redis today as a temporary idea, but do not capture that yet.
+Assistant: The previous MySQL plan is dead.
+User: The API key is sk-test-1234567890abcdef.
+Assistant: Failed approach: shelling out to npm did not work after the pnpm switch.

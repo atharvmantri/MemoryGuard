@@ -1,0 +1,21 @@
+{
+  "name": "@memoryguard/sdk",
+  "version": "0.1.0",
+  "description": "MemoryGuard OSS TypeScript SDK — REST client for the MemoryGuard API.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "echo \"no lint yet\" && exit 0"
+  },
+  "devDependencies": {
+    "fast-check": "^3.22.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.9"
+  }
+}

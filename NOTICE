@@ -1,0 +1,45 @@
+MemoryGuard
+Copyright (c) 2024 The MemoryGuard Authors
+
+This product includes software developed by The MemoryGuard Authors.
+
+The open-source core of MemoryGuard is licensed under the Apache License,
+Version 2.0 (the "License"); you may not use these files except in compliance
+with the License. You may obtain a copy of the License at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
+
+-------------------------------------------------------------------------------
+Open-core boundary
+-------------------------------------------------------------------------------
+
+The following packages are open source under Apache-2.0 (see LICENSE):
+
+    packages/core, packages/cli, packages/sdk-python, packages/sdk-ts,
+    packages/mcp-server, packages/local-dashboard, packages/models,
+    packages/model-serving, packages/training, packages/evals, apps/api
+
+The following packages are commercial and NOT covered by Apache-2.0. They are
+governed by the terms in LICENSE-commercial.md and carry their own per-package
+LICENSE notices:
+
+    packages/enterprise, packages/policy-engine, packages/audit,
+    packages/security, apps/web
+
+-------------------------------------------------------------------------------
+Third-party components
+-------------------------------------------------------------------------------
+
+This software depends on third-party open-source components, each distributed
+under its own license. Notable runtime dependencies include FastAPI, Typer,
+Rich, Hypothesis, and (for the optional cloud store) psycopg with pgvector.
+Refer to each project's distribution for its respective license terms.
+
+Brand assets (the "Vault Mesh" logo, icons, and palette) in Brand-Kit/ and
+apps/web/public/brand/ are NOT licensed under Apache-2.0 and remain subject to
+the MemoryGuard trademark/usage terms.
