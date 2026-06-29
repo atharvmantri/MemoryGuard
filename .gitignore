@@ -83,3 +83,6 @@ temp/
 # --- Private / non-public docs (strategy, PRDs) ---
 docs/private/
 *-PRD.pdf
+
+# TypeScript incremental build artifacts
+**/*.tsbuildinfo

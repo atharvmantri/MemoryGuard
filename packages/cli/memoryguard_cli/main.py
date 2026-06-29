@@ -19,6 +19,8 @@ Requirements: 1.1, 1.2, 1.5, 10.1–10.7.
 from __future__ import annotations
 
 import re
+import shutil
+import sys
 import tempfile
 import time
 from dataclasses import dataclass
@@ -56,7 +58,8 @@ from memoryguard_core.capture import (
     reject_candidate,
 )
 
-from .config import StoreInitError, init_store, load_config, store_exists
+from . import __version__
+from .config import StoreConfig, StoreInitError, init_store, load_config, store_exists
 from .remote import RemoteClient, RemoteError
 
 app = typer.Typer(
@@ -64,6 +67,7 @@ app = typer.Typer(
     help=(
         "MemoryGuard keeps AI coding-agent context files current and secret-safe.\n\n"
         "Basic:\n"
+        "  memoryguard doctor\n"
         "  memoryguard init\n"
         '  memoryguard remember "This project uses Flask for the backend."\n'
         "  memoryguard sync\n\n"
@@ -1336,6 +1340,273 @@ def _assert_demo_passed(agents: str, context_text: str, root: Path) -> None:
     for rel_path in CONTEXT_FILES:
         if not (root / rel_path).is_file():
             raise ValueError(f"missing context file: {rel_path}")
+
+
+# ---------------------------------------------------------------------------
+# doctor
+# ---------------------------------------------------------------------------
+
+
+# Status levels for the doctor command output. The numeric ordering matters
+# because we use ``max(...)`` to compute the overall exit verdict.
+_DOCTOR_OK = 0
+_DOCTOR_WARN = 1
+_DOCTOR_ERROR = 2
+
+_DOCTOR_STATUS_STYLE = {
+    _DOCTOR_OK: ("pass", "green"),
+    _DOCTOR_WARN: ("warn", "yellow"),
+    _DOCTOR_ERROR: ("error", "red"),
+}
+
+# Minimum Python version supported by MemoryGuard. Older interpreters cannot
+# import the core/CLI and would fail at runtime; doctor surfaces that as a
+# real error so the wrapper installer does not silently hand the user a
+# broken install.
+_MIN_PYTHON = (3, 11)
+
+
+@dataclass
+class _DoctorCheck:
+    """A single doctor check row."""
+
+    name: str
+    status: int
+    detail: str
+    hint: Optional[str] = None
+
+
+def _doctor_check_external(cmd: str) -> Optional[str]:
+    """Return the resolved path of ``cmd`` if it is on PATH, else None."""
+    return shutil.which(cmd)
+
+
+def _doctor_check_store(state: CLIState) -> tuple[Optional[StoreConfig], _DoctorCheck]:
+    """Probe whether the current directory (or ``--store``) holds a project store."""
+    try:
+        cfg = load_config(state.store)
+    except StoreInitError as exc:
+        return None, _DoctorCheck(
+            name="MemoryGuard store",
+            status=_DOCTOR_WARN,
+            detail=f"no store found ({exc})",
+            hint="run `memoryguard init` in your project directory",
+        )
+
+    if state.is_remote:
+        detail = f"remote mode (active store: {cfg.db_path})"
+    else:
+        detail = f"local store at {cfg.db_path}"
+    return cfg, _DoctorCheck(
+        name="MemoryGuard store",
+        status=_DOCTOR_OK,
+        detail=detail,
+    )
+
+
+def _doctor_check_context_files(cfg: Optional[StoreConfig]) -> _DoctorCheck:
+    """Report which context files exist (only meaningful when a store is present)."""
+    if cfg is None:
+        return _DoctorCheck(
+            name="Context files",
+            status=_DOCTOR_OK,
+            detail="skipped (no store)",
+        )
+    missing = [rel for rel in CONTEXT_FILES if not (cfg.root / rel).is_file()]
+    if not missing:
+        return _DoctorCheck(
+            name="Context files",
+            status=_DOCTOR_OK,
+            detail=f"all {len(CONTEXT_FILES)} present",
+        )
+    return _DoctorCheck(
+        name="Context files",
+        status=_DOCTOR_WARN,
+        detail=f"missing {len(missing)} of {len(CONTEXT_FILES)}: {', '.join(missing)}",
+        hint="run `memoryguard sync` to generate them",
+    )
+
+
+def _doctor_check_pending(cfg: Optional[StoreConfig]) -> _DoctorCheck:
+    """Report whether pending capture candidates are waiting for review."""
+    if cfg is None:
+        return _DoctorCheck(
+            name="Pending capture candidates",
+            status=_DOCTOR_OK,
+            detail="skipped (no store)",
+        )
+    pending = list_candidates(cfg.root, status=CaptureStatus.PENDING)
+    if not pending:
+        return _DoctorCheck(
+            name="Pending capture candidates",
+            status=_DOCTOR_OK,
+            detail="0 pending",
+        )
+    return _DoctorCheck(
+        name="Pending capture candidates",
+        status=_DOCTOR_WARN,
+        detail=f"{len(pending)} pending approval",
+        hint="run `memoryguard capture pending` then `memoryguard capture approve --all`",
+    )
+
+
+def _doctor_check_git() -> _DoctorCheck:
+    """Report whether ``git`` is on PATH. Optional for the CLI, but useful for
+    repo ingestion and Agent Capture workflows."""
+    if _doctor_check_external("git"):
+        return _DoctorCheck(
+            name="Git",
+            status=_DOCTOR_OK,
+            detail="on PATH",
+        )
+    return _DoctorCheck(
+        name="Git",
+        status=_DOCTOR_WARN,
+        detail="not on PATH (optional; only needed for `ingest` of git repos and `capture` review)",
+    )
+
+
+def _doctor_check_node_optional() -> _DoctorCheck:
+    """Report whether ``node`` and ``pnpm`` are on PATH. The CLI itself does
+    NOT require Node.js — these are only relevant for the local dashboard and
+    TypeScript SDK development."""
+    node = _doctor_check_external("node")
+    pnpm = _doctor_check_external("pnpm")
+    if node and pnpm:
+        return _DoctorCheck(
+            name="Node.js / pnpm (dev only)",
+            status=_DOCTOR_OK,
+            detail="node and pnpm on PATH (dev tools, not required for the CLI)",
+        )
+    missing = [name for name, present in (("node", node), ("pnpm", pnpm)) if not present]
+    return _DoctorCheck(
+        name="Node.js / pnpm (dev only)",
+        status=_DOCTOR_OK,
+        detail=(
+            f"missing: {', '.join(missing)} (dev tools only; the MemoryGuard CLI "
+            f"itself does not require them)"
+        ),
+    )
+
+
+@app.command()
+def doctor(
+    ctx: typer.Context,
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help=(
+            "Exit non-zero on any warning in addition to errors. The default "
+            "(lenient) mode exits 0 whenever there are no real errors, even if "
+            "the user has not yet created a project store."
+        ),
+    ),
+) -> None:
+    """Check the local MemoryGuard install: CLI, store, context files, and tools.
+
+    Default (lenient) mode exits 0 whenever there are no real errors. A fresh
+    user running ``memoryguard doctor`` before ``memoryguard init`` will see
+    warnings about a missing store, but the command will still exit 0.
+
+    Pass ``--strict`` to also exit non-zero on warnings (useful for CI and
+    for diagnosing an install you expect to be fully green).
+
+    Real errors — for example, a Python version that is too old to import the
+    core — always exit 1.
+    """
+    state: CLIState = ctx.obj
+
+    checks: list[_DoctorCheck] = []
+
+    # CLI + Python + version — always available when this command runs.
+    checks.append(
+        _DoctorCheck(
+            name="MemoryGuard CLI",
+            status=_DOCTOR_OK,
+            detail=f"running v{__version__}",
+        )
+    )
+    py_impl = sys.implementation.name
+    py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    if (sys.version_info.major, sys.version_info.minor) < _MIN_PYTHON:
+        checks.append(
+            _DoctorCheck(
+                name="Python",
+                status=_DOCTOR_ERROR,
+                detail=(
+                    f"{py_impl} {py_ver} (MemoryGuard requires Python "
+                    f"{_MIN_PYTHON[0]}.{_MIN_PYTHON[1]}+)"
+                ),
+                hint=(
+                    "install Python 3.11+ and re-run the alpha installer; "
+                    "or re-run `uv python install 3.11 && uv sync --dev`"
+                ),
+            )
+        )
+    else:
+        checks.append(
+            _DoctorCheck(
+                name="Python",
+                status=_DOCTOR_OK,
+                detail=f"{py_impl} {py_ver} ({sys.executable})",
+            )
+        )
+
+    # uv is recommended for the alpha wrapper; flag it when missing only as a
+    # warning because the user could in theory run from an existing venv.
+    if _doctor_check_external("uv"):
+        checks.append(
+            _DoctorCheck(
+                name="uv",
+                status=_DOCTOR_OK,
+                detail="on PATH",
+            )
+        )
+    else:
+        checks.append(
+            _DoctorCheck(
+                name="uv",
+                status=_DOCTOR_WARN,
+                detail="not on PATH (the alpha wrapper depends on uv; install from https://astral.sh/uv)",
+            )
+        )
+
+    cfg, store_check = _doctor_check_store(state)
+    checks.append(store_check)
+    checks.append(_doctor_check_context_files(cfg))
+    checks.append(_doctor_check_pending(cfg))
+    checks.append(_doctor_check_git())
+    checks.append(_doctor_check_node_optional())
+
+    # Render.
+    table = Table(title="MemoryGuard doctor", show_header=True, header_style="bold")
+    table.add_column("Status", width=6)
+    table.add_column("Check", style="cyan")
+    table.add_column("Detail", overflow="fold")
+    for check in checks:
+        label, style = _DOCTOR_STATUS_STYLE[check.status]
+        detail = check.detail
+        if check.hint:
+            detail = f"{detail}\n    hint: {check.hint}"
+        table.add_row(f"[{style}]{label}[/{style}]", check.name, detail)
+    console.print(table)
+
+    overall = max(check.status for check in checks)
+    if overall == _DOCTOR_OK:
+        console.print("[green]all checks passed[/green]")
+        raise typer.Exit(code=0)
+    if overall == _DOCTOR_ERROR:
+        console.print("[red]doctor found errors[/red]")
+        raise typer.Exit(code=1)
+    # WARN is the only level that depends on --strict.
+    if strict:
+        console.print("[yellow]doctor found warnings (--strict)[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(
+        "[yellow]doctor found warnings[/yellow] "
+        "(lenient mode: exit 0; pass --strict to fail on warnings)"
+    )
+    raise typer.Exit(code=0)
 
 
 # ---------------------------------------------------------------------------

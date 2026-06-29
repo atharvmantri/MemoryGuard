@@ -66,14 +66,22 @@ _VALID_TIERS = set(Sensitivity)
 # ---------------------------------------------------------------------------
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
+# Prefer the fixture that ships with this test package (public OSS path);
+# fall back to the evals package location used in the private monorepo.
 _FIXTURES = (
-    _REPO_ROOT
-    / "packages"
-    / "evals"
-    / "memoryguard_evals"
+    Path(__file__).resolve().parent
     / "fixtures"
     / "sensitive_fixtures.jsonl"
 )
+if not _FIXTURES.is_file():
+    _FIXTURES = (
+        _REPO_ROOT
+        / "packages"
+        / "evals"
+        / "memoryguard_evals"
+        / "fixtures"
+        / "sensitive_fixtures.jsonl"
+    )
 
 _ELEVATED = (Sensitivity.SECRET, Sensitivity.PII)
 

@@ -112,6 +112,7 @@ def test_help_contains_happy_paths():
     assert "MemoryGuard keeps AI coding-agent context files current and secret-safe" in (
         result.stdout
     )
+    assert "memoryguard doctor" in result.stdout
     assert "memoryguard init" in result.stdout
     assert 'memoryguard remember "This project uses Flask for the backend."' in result.stdout
     assert "memoryguard sync" in result.stdout
@@ -645,6 +646,122 @@ def test_demo_runs_in_temporary_project(tmp_path):
     assert result.exit_code == 0, _text(result)
     assert "Agent Capture demo passed." in result.stdout
     assert "approved" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# doctor
+# ---------------------------------------------------------------------------
+
+
+def test_doctor_outside_project_exits_zero_in_lenient_mode(tmp_path, monkeypatch):
+    # Outside a project, the store check warns, but CLI/Python/uv/etc. should
+    # pass. In the default (lenient) mode the command should still exit 0 so
+    # that a brand-new user running `memoryguard doctor` before
+    # `memoryguard init` does not see a scary non-zero status.
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["doctor"], env=_ENV)
+    assert result.exit_code == 0, _text(result)
+    out = result.stdout
+    assert "MemoryGuard doctor" in out
+    assert "MemoryGuard CLI" in out
+    assert "running v" in out
+    assert "Python" in out
+    assert "uv" in out
+    # Store row: the absence of a project is the expected alpha state.
+    assert "no store found" in out.lower()
+    # Context files and pending candidates should be marked skipped (no store).
+    assert "skipped (no store)" in out.lower()
+    # Git row is present.
+    assert "Git" in out
+    # The wrapper is honest about Node/pnpm being dev-only.
+    assert "Node.js / pnpm (dev only)" in out
+    # Verdict line is friendly: warnings did not flip the exit code.
+    assert "lenient mode" in out.lower()
+
+
+def test_doctor_outside_project_strict_exits_nonzero(tmp_path, monkeypatch):
+    # Same setup as the lenient test, but with --strict, warnings flip the
+    # exit code to 1. This is the diagnostic / CI mode.
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(app, ["doctor", "--strict"], env=_ENV)
+    assert result.exit_code == 1, _text(result)
+    out = result.stdout
+    assert "no store found" in out.lower()
+    # The strict-mode verdict line is explicit about why we failed.
+    assert "strict" in out.lower()
+    assert "warnings" in out.lower()
+
+
+def test_doctor_inside_initialized_project_runs(tmp_path):
+    # Inside an initialized project, the store row should pass and the verdict
+    # may still be warn if the context files haven't been generated yet — but
+    # the command should not error and should not report "no store found".
+    project = tmp_path / "proj"
+    _init(project)
+
+    result = runner.invoke(app, ["--store", str(project), "doctor"], env=_ENV)
+    # Lenient mode: 0. Strict mode: 1 (context-files warn). We are not
+    # passing --strict here, so the expected exit is 0.
+    assert result.exit_code == 0, _text(result)
+    out = result.stdout
+    assert "MemoryGuard doctor" in out
+    assert "running v" in out
+    # Store check resolves to "local store at ..." rather than "no store found".
+    assert "local store at" in out
+    assert "no store found" not in out.lower()
+    # Pending candidates row should be present (zero is fine for a fresh init).
+    assert "pending capture candidates" in out.lower()
+
+
+def test_doctor_exit_zero_when_store_and_context_files_present(tmp_path):
+    # Full pass: a project with a generated context block should make the
+    # context-files row pass. Pending candidates may still be 0, store row is
+    # pass, and there should be no real errors. Exit code is therefore 0.
+    project = tmp_path / "proj"
+    _init(project)
+    # Add a memory and sync so the context files exist.
+    _add(project, "Frontend framework: React.")
+    sync = runner.invoke(app, ["--store", str(project), "sync"], env=_ENV)
+    assert sync.exit_code == 0, _text(sync)
+
+    result = runner.invoke(app, ["--store", str(project), "doctor"], env=_ENV)
+    assert result.exit_code == 0, _text(result)
+    out = result.stdout
+    # Store + context-files rows are explicit "pass" cells.
+    assert "pass" in out
+    # The context-files row should report "all 4 present" once sync wrote them.
+    assert "all 4 present" in out
+    # The friendly "all checks passed" verdict is rendered on a full pass.
+    assert "all checks passed" in out.lower()
+
+
+def test_doctor_warns_when_context_files_missing_but_exits_zero(tmp_path):
+    # Initialized project with no sync yet: context-files row is warn, but
+    # the lenient exit code is still 0. --strict flips it to 1.
+    project = tmp_path / "proj"
+    _init(project)
+
+    result = runner.invoke(app, ["--store", str(project), "doctor"], env=_ENV)
+    assert result.exit_code == 0, _text(result)
+    out = result.stdout
+    # Context-files row reports missing files and suggests `memoryguard sync`.
+    assert "missing" in out.lower()
+    assert "memoryguard sync" in out
+
+    # Strict mode flips the same warning to a non-zero exit.
+    strict = runner.invoke(
+        app, ["--store", str(project), "doctor", "--strict"], env=_ENV
+    )
+    assert strict.exit_code == 1, _text(strict)
+
+
+def test_help_mentions_doctor_command():
+    result = runner.invoke(app, ["--help"], env=_ENV)
+    assert result.exit_code == 0, _text(result)
+    # `doctor` is registered as a top-level command and should be in --help.
+    assert "doctor" in result.stdout
 
 
 if __name__ == "__main__":  # pragma: no cover

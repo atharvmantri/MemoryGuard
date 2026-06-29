@@ -37,36 +37,59 @@ AI coding agents forget project decisions between sessions. Humans end up re-exp
 
 ## 2-Minute Demo
 
-From source during alpha:
+Clone, run the one-time alpha installer, then `memoryguard demo`:
 
 ```bash
-uv sync --dev
-pnpm install
-uv run memoryguard demo
+git clone https://github.com/atharvmantri/MemoryGuard.git
+cd MemoryGuard
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy Bypass -File scripts/install-alpha.ps1
+
+# macOS / Linux
+bash scripts/install-alpha.sh
+
+memoryguard doctor
+memoryguard demo
 ```
 
 The demo runs in a temporary project and proves transcript capture, pending approval, safe approval, context sync, supersession, and fake-secret non-leakage.
 
-## Quickstart From Source During Alpha
+## Quickstart
 
-Package install is coming soon. For now, run from a clone:
+There is no PyPI or npm package to install during alpha. The supported flow
+is clone + the one-time `scripts/install-alpha.{ps1,sh}` installer, which
+sets up a thin `memoryguard` wrapper on your `PATH` and runs `uv sync --dev`
+under the hood. Node/pnpm are only needed for the local dashboard and
+TypeScript SDK — not for the CLI.
 
-```bash
-uv sync --dev
-pnpm install
-uv run memoryguard init
-uv run memoryguard remember "This project uses Flask for the backend."
-uv run memoryguard sync
-uv run memoryguard status
-```
-
-If the `memoryguard` script is already on your PATH, you can omit `uv run`:
+After the installer finishes:
 
 ```bash
 memoryguard init
 memoryguard remember "This project uses Flask for the backend."
 memoryguard sync
+memoryguard status
 ```
+
+### Available after this update is pushed and verified
+
+Once this update is pushed to `main` on the public repo and the raw GitHub
+URLs below are verified to resolve, a one-line install will be available:
+
+```powershell
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/atharvmantri/MemoryGuard/main/scripts/install-alpha.ps1 | iex
+```
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/atharvmantri/MemoryGuard/main/scripts/install-alpha.sh | bash
+```
+
+Until those raw URLs are verified live from `raw.githubusercontent.com`,
+the one-liner is **not** the recommended quickstart. Use the clone + run
+local script flow above.
 
 ## Agent Capture Demo
 
@@ -101,6 +124,7 @@ memoryguard capture reject <candidate_id>
 memoryguard capture clear-rejected
 memoryguard sync
 memoryguard status
+memoryguard doctor
 memoryguard demo
 ```
 

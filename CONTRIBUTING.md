@@ -5,6 +5,12 @@ Thanks for helping improve MemoryGuard.
 ## Setup
 
 ```bash
+# Alpha wrapper: a one-time installer gives you the `memoryguard` command.
+bash scripts/install-alpha.sh   # macOS / Linux
+# or, on Windows:
+# powershell -ExecutionPolicy Bypass -File scripts/install-alpha.ps1
+
+# From source, the same workspace is wired up with `uv` and `pnpm`:
 uv sync --dev
 pnpm install
 uv run pytest
@@ -26,6 +32,19 @@ uv run pytest
 ```
 
 ## Local CLI Loop
+
+With the alpha wrapper installed, you can use the `memoryguard` command
+directly:
+
+```bash
+memoryguard doctor
+memoryguard init
+memoryguard remember "This project uses Flask for the backend."
+memoryguard sync
+memoryguard status
+```
+
+If you would rather not install the wrapper (e.g. for active development):
 
 ```bash
 uv run memoryguard init

@@ -1,0 +1,21 @@
+# Sensitive-data eval set: known secret/PII (label 1) vs benign (label 0).
+# Fields: id, content, label, detected, suggested_sensitivity
+# NOTE: all secrets below are clearly fake example values, never real credentials.
+{"id":"s_001","content":"AWS access key AKIAIOSFODNN7EXAMPLE for the deploy bot","label":1,"detected":["aws_access_key_id"],"suggested_sensitivity":"secret"}
+{"id":"s_002","content":"aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY","label":1,"detected":["aws_secret_access_key"],"suggested_sensitivity":"secret"}
+{"id":"s_003","content":"DB_PASSWORD=hunter2-not-a-real-password set in the staging env","label":1,"detected":["password"],"suggested_sensitivity":"secret"}
+{"id":"s_004","content":"Contact the on-call engineer at jane.doe@example.com for incidents","label":1,"detected":["email"],"suggested_sensitivity":"pii"}
+{"id":"s_005","content":"GitHub token ghp_EXAMPLEEXAMPLEEXAMPLEEXAMPLEEX1234 stored in CI","label":1,"detected":["github_token"],"suggested_sensitivity":"secret"}
+{"id":"s_006","content":"-----BEGIN RSA PRIVATE KEY----- MIIEcESTfakekeymaterialEXAMPLE -----END RSA PRIVATE KEY-----","label":1,"detected":["private_key"],"suggested_sensitivity":"secret"}
+{"id":"s_007","content":"Customer SSN 123-45-6789 was provided during signup","label":1,"detected":["ssn"],"suggested_sensitivity":"pii"}
+{"id":"s_008","content":"Test card 4111 1111 1111 1111 exp 12/29 used in the sandbox","label":1,"detected":["credit_card"],"suggested_sensitivity":"pii"}
+{"id":"s_009","content":"Slack webhook https://hooks.slack.com/services/T00000000/B00000000/EXAMPLEtokenXYZ","label":1,"detected":["slack_webhook"],"suggested_sensitivity":"secret"}
+{"id":"s_010","content":"Bearer token Authorization: Bearer eyJhbGciOiJIUzI1NiEXAMPLE.payload.signature","label":1,"detected":["bearer_token"],"suggested_sensitivity":"secret"}
+{"id":"s_011","content":"The API returns JSON with a list of memory records","label":0,"detected":[],"suggested_sensitivity":"internal"}
+{"id":"s_012","content":"We use SQLite locally and PostgreSQL in the cloud deployment","label":0,"detected":[],"suggested_sensitivity":"internal"}
+{"id":"s_013","content":"The trust score is a weighted blend of five bounded signals","label":0,"detected":[],"suggested_sensitivity":"internal"}
+{"id":"s_014","content":"Documentation explains the open-core licensing boundary","label":0,"detected":[],"suggested_sensitivity":"public"}
+{"id":"s_015","content":"Reranking happens in stage two of the retrieval pipeline","label":0,"detected":[],"suggested_sensitivity":"internal"}
+{"id":"s_016","content":"The dashboard uses the Vault Mesh brand colors","label":0,"detected":[],"suggested_sensitivity":"public"}
+{"id":"s_017","content":"Contradiction detection compares scope-comparable memory pairs","label":0,"detected":[],"suggested_sensitivity":"internal"}
+{"id":"s_018","content":"Ingestion chunks files and attaches provenance per chunk","label":0,"detected":[],"suggested_sensitivity":"internal"}
