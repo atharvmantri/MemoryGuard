@@ -1,0 +1,5 @@
+.next/
+.turbo/
+node_modules/
+out/
+screenshots/

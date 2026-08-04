@@ -1,0 +1,6 @@
+[build]
+  command = "pnpm --filter @memoryguard/landing build"
+  publish = "apps/landing/out"
+
+[build.environment]
+  NODE_VERSION = "20"
