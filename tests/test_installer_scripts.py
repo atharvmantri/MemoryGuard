@@ -68,8 +68,12 @@ def test_install_scripts_exist():
     for rel in (
         "scripts/install-alpha.sh",
         "scripts/install-alpha.ps1",
+        "scripts/install.sh",
+        "scripts/install.ps1",
         "scripts/uninstall-alpha.sh",
         "scripts/uninstall-alpha.ps1",
+        "scripts/uninstall.sh",
+        "scripts/uninstall.ps1",
     ):
         path = REPO_ROOT / rel
         assert path.is_file(), f"missing installer script: {rel}"
@@ -515,3 +519,169 @@ def test_uninstall_alpha_sh_is_executable():
     path = REPO_ROOT / "scripts" / "uninstall-alpha.sh"
     mode = path.stat().st_mode
     assert mode & stat.S_IXUSR, "uninstall-alpha.sh must be executable by the user"
+
+
+# ---------------------------------------------------------------------------
+# One-command bootstrap installer (install.ps1 / install.sh / uninstall.{ps1,sh})
+# ---------------------------------------------------------------------------
+
+
+def test_install_ps1_uses_default_source_dir():
+    text = _read("scripts/install.ps1")
+    # Default source dir on Windows: %LOCALAPPDATA%\MemoryGuard\source.
+    assert "LOCALAPPDATA" in text
+    assert "MemoryGuard" in text
+    assert "source" in text
+
+
+def test_install_sh_uses_default_source_dir():
+    text = _read("scripts/install.sh")
+    # Default source dir on macOS/Linux: ~/.local/share/memoryguard/source.
+    assert ".local/share/memoryguard/source" in text
+    # Override via env var.
+    assert "MEMORYGUARD_SOURCE_DIR" in text
+
+
+def test_install_ps1_clones_public_repo():
+    text = _read("scripts/install.ps1")
+    # The bootstrap must clone the public repo (not a placeholder or local path).
+    assert "atharvmantri/MemoryGuard" in text
+    assert "git clone" in text
+
+
+def test_install_sh_clones_public_repo():
+    text = _read("scripts/install.sh")
+    assert "atharvmantri/MemoryGuard" in text
+    assert "git clone" in text
+
+
+def test_install_ps1_invokes_install_alpha():
+    text = _read("scripts/install.ps1")
+    # After clone/update + uv sync, the bootstrap must hand off to
+    # install-alpha.ps1 inside the cloned source dir.
+    assert "install-alpha.ps1" in text
+
+
+def test_install_sh_invokes_install_alpha():
+    text = _read("scripts/install.sh")
+    assert "install-alpha.sh" in text
+
+
+def test_install_ps1_passes_through_no_path_update():
+    text = _read("scripts/install.ps1")
+    # The bootstrap must forward -NoPathUpdate to install-alpha.ps1.
+    assert "NoPathUpdate" in text
+
+
+def test_install_sh_passes_through_no_path_update():
+    text = _read("scripts/install.sh")
+    # bash long-form pass-through.
+    assert "--no-path-update" in text
+
+
+def test_install_ps1_prerequisites_clear_error():
+    text = _read("scripts/install.ps1")
+    # If git or uv is missing the script must print a clear instruction
+    # and exit non-zero rather than partially installing.
+    assert "git is not on your PATH" in text
+    assert "uv is not on your PATH" in text
+    assert "exit 1" in text
+
+
+def test_install_sh_prerequisites_clear_error():
+    text = _read("scripts/install.sh")
+    assert "git is not on your PATH" in text
+    assert "uv is not on your PATH" in text
+
+
+def test_install_ps1_refuses_non_memoryguard_dir():
+    text = _read("scripts/install.ps1")
+    # The bootstrap must refuse to overwrite an existing dir that is not a
+    # MemoryGuard git repo.
+    assert "is not a MemoryGuard git repo" in text
+
+
+def test_install_sh_refuses_non_memoryguard_dir():
+    text = _read("scripts/install.sh")
+    assert "is not a MemoryGuard git repo" in text
+
+
+def test_uninstall_ps1_calls_alpha_and_handles_source_removal():
+    text = _read("scripts/uninstall.ps1")
+    assert "uninstall-alpha.ps1" in text
+    assert "RemoveSource" in text
+
+
+def test_uninstall_sh_calls_alpha_and_handles_source_removal():
+    text = _read("scripts/uninstall.sh")
+    assert "uninstall-alpha.sh" in text
+    assert "--remove-source" in text
+
+
+def test_install_alpha_supports_remove_shadowing_commands():
+    # Both the bash and PowerShell installers must accept the
+    # --remove-shadowing-commands / -RemoveShadowingCommands flag and move
+    # the offending file out of the way.
+    sh = _read("scripts/install-alpha.sh")
+    ps1 = _read("scripts/install-alpha.ps1")
+    assert "--remove-shadowing-commands" in sh
+    assert "RemoveShadowingCommands" in ps1
+    # The bash flag actually renames the file to a sentinel name.
+    assert "disabled-by-memoryguard" in sh
+    assert "disabled-by-memoryguard" in ps1
+
+
+def test_install_alpha_ps1_help_documents_remove_shadowing_commands():
+    # The PowerShell comment block / synopsis should mention the new flag so
+    # users discover it from the help banner.
+    ps1 = _read("scripts/install-alpha.ps1")
+    assert "RemoveShadowingCommands" in ps1
+
+
+def test_install_sh_is_executable():
+    if platform.system() == "Windows":
+        pytest.skip("POSIX executable bit is a no-op on Windows")
+    path = REPO_ROOT / "scripts" / "install.sh"
+    mode = path.stat().st_mode
+    assert mode & stat.S_IXUSR, "install.sh must be executable by the user"
+
+
+def test_uninstall_sh_is_executable():
+    if platform.system() == "Windows":
+        pytest.skip("POSIX executable bit is a no-op on Windows")
+    path = REPO_ROOT / "scripts" / "uninstall.sh"
+    mode = path.stat().st_mode
+    assert mode & stat.S_IXUSR, "uninstall.sh must be executable by the user"
+
+
+# ---------------------------------------------------------------------------
+# Docs mention the one-line commands
+# ---------------------------------------------------------------------------
+
+
+def test_readme_mentions_one_line_install():
+    readme = REPO_ROOT / "README.md"
+    if not readme.is_file():
+        pytest.skip("no README.md at repo root")
+    text = readme.read_text(encoding="utf-8")
+    low = text.lower()
+    assert "irm " in low and "raw.githubusercontent.com" in low and "install.ps1" in low, (
+        "README.md must mention the PowerShell one-line install command"
+    )
+    assert "curl" in low and "raw.githubusercontent.com" in low and "install.sh" in low, (
+        "README.md must mention the bash one-line install command"
+    )
+
+
+def test_public_oss_export_readme_mentions_one_line_install():
+    readme = REPO_ROOT / "public-oss-export" / "README.md"
+    if not readme.is_file():
+        pytest.skip("no README.md in public-oss-export")
+    text = readme.read_text(encoding="utf-8")
+    low = text.lower()
+    assert "irm " in low and "install.ps1" in low, (
+        "public-oss-export README.md must mention the PowerShell one-line install"
+    )
+    assert "curl" in low and "install.sh" in low, (
+        "public-oss-export README.md must mention the bash one-line install"
+    )

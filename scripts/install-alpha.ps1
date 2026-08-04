@@ -29,7 +29,8 @@
 param(
     [switch]$Force,
     [string]$InstallDir,
-    [switch]$NoPathUpdate
+    [switch]$NoPathUpdate,
+    [switch]$RemoveShadowingCommands
 )
 
 $ErrorActionPreference = "Stop"
@@ -216,6 +217,20 @@ if ($uniqueCollisions.Count -gt 0) {
     Write-Host "    3. Move $InstallDir ahead of every conflicting directory in PATH"
     Write-Host "       (this installer will do that below if you let it update PATH)."
     Write-Host ""
+    if ($RemoveShadowingCommands) {
+        Write-Step "Removing shadowing commands (-RemoveShadowingCommands)"
+        foreach ($c in $uniqueCollisions) {
+            $stale = $c.Path
+            if (-not (Test-Path -LiteralPath $stale)) { continue }
+            $backup = "$stale.disabled-by-memoryguard"
+            try {
+                Move-Item -LiteralPath $stale -Destination $backup -Force
+                Write-Ok "moved $stale -> $backup"
+            } catch {
+                Write-Warn "could not move $stale (try renaming it manually): $_"
+            }
+        }
+    }
 } else {
     Write-Ok "no pre-existing memoryguard files on PATH"
 }

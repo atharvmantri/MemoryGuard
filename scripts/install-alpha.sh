@@ -28,6 +28,7 @@ set -euo pipefail
 
 NO_PATH_UPDATE=0
 FORCE=0
+REMOVE_SHADOWING=0
 INSTALL_DIR="${MEMORYGUARD_INSTALL_DIR:-$HOME/.local/bin}"
 POSITIONAL=()
 for arg in "$@"; do
@@ -35,18 +36,26 @@ for arg in "$@"; do
         --no-path-update)
             NO_PATH_UPDATE=1
             ;;
+        --remove-shadowing-commands)
+            REMOVE_SHADOWING=1
+            ;;
         --force|-f)
             FORCE=1
             ;;
         --help|-h)
             cat <<USAGE
-Usage: bash scripts/install-alpha.sh [--no-path-update] [--force]
+Usage: bash scripts/install-alpha.sh [--no-path-update] [--remove-shadowing-commands]
 
 Options:
-  --no-path-update   Do not modify the user PATH or the current session PATH.
-                     Only the wrapper file is written.
-  --force            Reserved; current installer is idempotent.
-  -h, --help         Show this help.
+  --no-path-update           Do not modify the user PATH or the current session PATH.
+                             Only the wrapper file is written.
+  --remove-shadowing-commands
+                             Move any pre-existing memoryguard files on PATH
+                             (the ones that would shadow the wrapper) out of
+                             the way by renaming them to
+                             "memoryguard.disabled-by-memoryguard".
+  --force                    Reserved; current installer is idempotent.
+  -h, --help                 Show this help.
 USAGE
             exit 0
             ;;
@@ -142,6 +151,24 @@ if [[ "$collision_found" -eq 1 ]]; then
     echo "       directory in PATH (this installer will do that below if you"
     echo "       let it update PATH)."
     echo
+    if [[ "$REMOVE_SHADOWING" -eq 1 ]]; then
+        echo "==> Moving shadowing commands out of the way (-remove-shadowing-commands)"
+        IFS=':' read -ra _path_dirs <<< "$PATH"
+        for d in "${_path_dirs[@]}"; do
+            d="${d%/}"
+            [[ "$d" == "$INSTALL_DIR" ]] && continue
+            for name in memoryguard memoryguard.bin memoryguard.exe memoryguard.sh; do
+                stale="$d/$name"
+                if [[ ! -e "$stale" ]]; then continue; fi
+                backup="$stale.disabled-by-memoryguard"
+                if mv "$stale" "$backup"; then
+                    echo "  [ok] moved $stale -> $backup"
+                else
+                    echo "  [warn] could not move $stale (try renaming it manually)" >&2
+                fi
+            done
+        done
+    fi
 else
     echo "  [ok] no pre-existing memoryguard files on PATH"
 fi

@@ -648,6 +648,60 @@ def test_demo_runs_in_temporary_project(tmp_path):
     assert "approved" in result.stdout
 
 
+def test_demo_does_not_create_memoryguard_in_cwd(tmp_path, monkeypatch):
+    # `memoryguard demo` must not write ``.memoryguard/`` to the process cwd.
+    # The model registry is now derived from the temp project's ``.memoryguard/``
+    # dir (which is under the temp dir, not the cwd), so the demo passes
+    # even when the cwd is read-only or restricted (e.g. ``C:\\Windows\\System32``).
+    cwd_dir = tmp_path / "fake_cwd"
+    cwd_dir.mkdir()
+    # Run from a clean cwd, then assert no .memoryguard/ was created there.
+    monkeypatch.chdir(cwd_dir)
+    result = runner.invoke(app, ["demo"], env=_ENV)
+    assert result.exit_code == 0, _text(result)
+    assert "Agent Capture demo passed." in result.stdout
+    # The cwd must not have been polluted with a .memoryguard/ tree.
+    assert not (cwd_dir / ".memoryguard").exists(), (
+        f"demo must not create .memoryguard/ in cwd; "
+        f"found it at {cwd_dir / '.memoryguard'}"
+    )
+
+
+def test_demo_works_from_read_only_cwd(tmp_path, monkeypatch):
+    # Regression: ``memoryguard demo`` used to fail with
+    # ``PermissionError: [WinError 5] Access is denied: '.memoryguard'`` when
+    # the cwd was protected (e.g. ``C:\\Windows\\System32``) because the model
+    # registry defaulted to ``<cwd>/.memoryguard/models``. After the fix the
+    # registry is anchored to the project, so the demo must succeed even when
+    # the cwd is read-only.
+    import os
+    import stat
+
+    cwd_dir = tmp_path / "readonly_cwd"
+    cwd_dir.mkdir()
+    # Remove write permission on the cwd. On Windows the readonly attribute
+    # is honored by most filesystem APIs; on POSIX chmod 0o500 achieves the
+    # same effect. We do this in a best-effort way because some sandboxes
+    # (and the Windows test runner) do not allow non-owners to remove all
+    # permissions from a temp dir; if it fails the test still exercises the
+    # main contract (cwd is not the demo's project).
+    try:
+        os.chmod(cwd_dir, 0o555 if os.name == "posix" else stat.S_IREAD)
+    except (OSError, PermissionError):
+        pass
+
+    monkeypatch.chdir(cwd_dir)
+    result = runner.invoke(app, ["demo"], env=_ENV)
+    # The demo must succeed (no PermissionError writing to cwd) ...
+    assert result.exit_code == 0, _text(result)
+    assert "Agent Capture demo passed." in result.stdout
+    # ... and the cwd must not contain a .memoryguard/ tree.
+    assert not (cwd_dir / ".memoryguard").exists(), (
+        f"demo must not create .memoryguard/ in cwd; "
+        f"found it at {cwd_dir / '.memoryguard'}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # doctor
 # ---------------------------------------------------------------------------

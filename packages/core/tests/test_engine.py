@@ -64,6 +64,63 @@ def test_build_local_engine_wires_oss_defaults() -> None:
     assert engine.audit is not None
 
 
+def test_model_registry_path_derives_from_db_path(tmp_path, monkeypatch) -> None:
+    """`build_local_engine` must anchor the model registry to the project.
+
+    The registry index must live next to the SQLite store (``<db_dir>/models``)
+    so that building an engine from a protected cwd (e.g. ``C:\\Windows\\System32``)
+    does not attempt to write ``.memoryguard/`` to that cwd.
+    """
+    project = tmp_path / "proj"
+    project.mkdir()
+    db = project / ".memoryguard" / "store.db"
+    db.parent.mkdir(parents=True, exist_ok=True)
+    db.write_text("", encoding="utf-8")
+
+    # Anchor cwd to a read-only / unrelated directory so the test would fail
+    # if any write were attempted there.
+    fake_cwd = tmp_path / "fake_cwd"
+    fake_cwd.mkdir()
+    monkeypatch.chdir(fake_cwd)
+
+    engine = build_local_engine(str(db))
+    try:
+        loader = engine.model_loader  # type: ignore[attr-defined]
+        registry = loader.registry
+        assert registry.index_path == project / ".memoryguard" / "models" / "index.json"
+    finally:
+        engine.store.close()
+
+    # The cwd must not have been polluted with a .memoryguard/ tree.
+    assert not (fake_cwd / ".memoryguard").exists()
+
+
+def test_model_registry_path_override(tmp_path) -> None:
+    """Explicit ``model_registry_path`` wins over the db-path default."""
+    explicit = tmp_path / "global_models" / "index.json"
+    engine = build_local_engine(":memory:", model_registry_path=explicit)
+    try:
+        loader = engine.model_loader  # type: ignore[attr-defined]
+        assert loader.registry.index_path == explicit
+    finally:
+        engine.store.close()
+
+
+def test_model_registry_path_in_memory_db_uses_cwd_default(tmp_path) -> None:
+    """``:memory:`` stores fall back to the historical cwd-relative default.
+
+    An in-memory store has no filesystem anchor, so the historical
+    cwd-relative default is preserved for callers that explicitly opt in to
+    ephemeral storage.
+    """
+    engine = build_local_engine(":memory:")
+    try:
+        loader = engine.model_loader  # type: ignore[attr-defined]
+        assert loader.registry.index_path == Path(".memoryguard") / "models" / "index.json"
+    finally:
+        engine.store.close()
+
+
 # ---------------------------------------------------------------------------
 # create_memory + get (Requirements 2.1, 2.6)
 # ---------------------------------------------------------------------------

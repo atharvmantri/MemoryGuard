@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""OSS composition root â€” wire a fully local :class:`MemoryGuardEngine`.
+"""OSS composition root — wire a fully local :class:`MemoryGuardEngine`.
 
 :func:`build_local_engine` is the single place where the OSS local-first engine
 is assembled from its parts. It selects the OSS local defaults for every model
@@ -11,12 +11,12 @@ Local-First Intelligence*).
 
 Wiring (all Apache-2.0 OSS defaults):
 
-* :class:`~memoryguard_core.store.sqlite_store.SqliteStore` â€” local SQLite store
+* :class:`~memoryguard_core.store.sqlite_store.SqliteStore` — local SQLite store
   (``":memory:"`` or a filesystem path).
-* :class:`~memoryguard_models.embedder.local_embedder.LocalEmbedder` â€” on-device
+* :class:`~memoryguard_models.embedder.local_embedder.LocalEmbedder` — on-device
   384-dim deterministic embedder (no external API), registered in the model
   registry + served by the local inference runner.
-* :class:`~memoryguard_models.reranker.heuristic.HeuristicReranker` â€” Stage-2
+* :class:`~memoryguard_models.reranker.heuristic.HeuristicReranker` — Stage-2
   reranker.
 * :class:`~memoryguard_core.trust.scoring.DeterministicTrustModel` +
   :class:`~memoryguard_core.trust.contradiction.RuleContradictionModel` wired
@@ -28,14 +28,14 @@ Wiring (all Apache-2.0 OSS defaults):
   every model task and the active :class:`FeatureFlags`, so each task resolves
   to its OSS local default while the task's commercial flag is off
   (Requirements 28.1, 28.3).
-* :class:`~memoryguard_core.ingestion.inspectors.CompositeIngestionInspector` â€”
+* :class:`~memoryguard_core.ingestion.inspectors.CompositeIngestionInspector` —
   OSS default chain (basic poison + sensitive-data detection).
-* :class:`~memoryguard_core.retrieval.policy_filter.AllowAllPolicy` â€” OSS policy.
+* :class:`~memoryguard_core.retrieval.policy_filter.AllowAllPolicy` — OSS policy.
 * an :class:`AuditSink`: :class:`LocalJsonlAuditSink` when ``audit_path`` is
   given, else :class:`NullAuditSink`.
 * :class:`~memoryguard_core.retrieval.service.RetrievalService` over the store,
   embedder, and reranker.
-* :class:`~memoryguard_core.flags.FeatureFlags` â€” defaults to
+* :class:`~memoryguard_core.flags.FeatureFlags` — defaults to
   :meth:`FeatureFlags.from_env`, with every commercial flag off so only OSS
   defaults are selected.
 
@@ -51,6 +51,7 @@ the composition root by the design's open-core boundary rules.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 from memoryguard_core.audit.hooks import (
@@ -84,6 +85,29 @@ __all__ = ["build_local_engine"]
 DEFAULT_DB_PATH = ":memory:"
 
 
+def _default_model_registry_path(db_path: str) -> Path:
+    """Derive a safe on-disk location for the model registry index.
+
+    For an in-memory store (``:memory:``) or any non-filesystem ``db_path`` we
+    return a project-local default under the current working directory's
+    ``.memoryguard/models/`` (the historical behavior, only triggered for
+    ephemeral stores where the caller has no project to anchor to).
+
+    For a real filesystem ``db_path`` the registry lives next to the store at
+    ``<db_dir>/models/index.json`` so the registry and the store travel together
+    on the same project. This is the cwd-safe default: callers running
+    ``memoryguard demo`` (or any other build_local_engine call) from a
+    protected / read-only working directory (e.g. ``C:\\Windows\\System32``)
+    still get a writable registry under the project or temp directory.
+    """
+    if db_path == ":memory:" or not db_path:
+        return Path(".memoryguard") / "models" / "index.json"
+    db = Path(db_path)
+    if not db.is_absolute() and db != Path("."):
+        return (db.parent / "models" / "index.json").resolve()
+    return db.parent / "models" / "index.json"
+
+
 def build_local_engine(
     db_path: str = DEFAULT_DB_PATH,
     *,
@@ -92,11 +116,12 @@ def build_local_engine(
     store: Optional[MemoryStore] = None,
     audit: Optional[AuditSink] = None,
     policy: Optional[PolicyProvider] = None,
+    model_registry_path: Optional[str | Path] = None,
 ) -> MemoryGuardEngine:
     """Construct a fully wired, local-first :class:`MemoryGuardEngine`.
 
     Args:
-        db_path: SQLite store location â€” a filesystem path, or ``":memory:"``
+        db_path: SQLite store location — a filesystem path, or ``":memory:"``
             (the default) for an ephemeral in-memory store. Ignored when an
             explicit ``store`` is supplied.
         flags: optional :class:`FeatureFlags`. When omitted, flags are read from
@@ -109,7 +134,7 @@ def build_local_engine(
             is used as-is (e.g. a ``PostgresStore`` injected by the hosted API's
             composition root when ``cloud_store`` is enabled) and ``db_path`` is
             ignored; otherwise a local :class:`SqliteStore` at ``db_path`` is
-            created. The store backend is the only swappable piece â€” every model
+            created. The store backend is the only swappable piece — every model
             component remains an OSS local default regardless.
         audit: optional pre-built :class:`AuditSink`. When provided it is used
             as-is (e.g. the commercial durable audit sink injected by the hosted
@@ -121,11 +146,17 @@ def build_local_engine(
             :class:`LocalJsonlAuditSink` (if ``audit_path`` is given) or a
             :class:`NullAuditSink` is used.
         policy: optional pre-built :class:`PolicyProvider`. When provided it is
-            used as-is replacing the OSS default
+            used as-is **replacing** the permissive default
             :class:`AllowAllPolicy`. The injected provider is a core
-            ``PolicyProvider`` instance, so this composition root never imports a
-            commercial package and the open-core boundary holds. When omitted the
-            permissive OSS :class:`AllowAllPolicy` is used.
+            :class:`PolicyProvider` instance, so this composition root never
+            imports any commercial package and the open-core boundary holds.
+            When omitted the permissive OSS :class:`AllowAllPolicy` is used.
+        model_registry_path: optional explicit path for the on-disk
+            :class:`LocalFileModelRegistry` index. When ``None`` (the default)
+            the registry is anchored to the project by deriving
+            ``<db_dir>/models/index.json`` from ``db_path`` so the registry and
+            the SQLite store travel together and never write to the caller's
+            cwd. Pass an explicit path to override.
 
     Returns:
         A :class:`MemoryGuardEngine` wired entirely from OSS local defaults.
@@ -150,6 +181,14 @@ def build_local_engine(
     trust_model = DeterministicTrustModel()
     contradiction_model = RuleContradictionModel(embedder=embedder)
 
+    # Resolve the model registry index. By default we anchor it to the project
+    # by deriving ``<db_dir>/models/index.json`` from ``db_path``. This keeps
+    # the registry next to the SQLite store and away from the caller's cwd, so
+    # the engine can be built from a protected cwd (e.g. ``C:\\Windows\\System32``)
+    # without trying to create ``.memoryguard/`` there.
+    if model_registry_path is None:
+        model_registry_path = _default_model_registry_path(db_path)
+
     # Registry + on-device inference runner, resolved through the loader. The
     # local embedder is registered in the registry (so it is discoverable by
     # model_id/version) and served in-process by the runner (no artifact files,
@@ -158,6 +197,7 @@ def build_local_engine(
     # is off.
     loader = _build_local_model_loader(
         active_flags,
+        model_registry_path=Path(model_registry_path),
         embedder=embedder,
         reranker=reranker,
         trust_model=trust_model,
@@ -172,12 +212,14 @@ def build_local_engine(
 
     # --- Injection interfaces: OSS defaults. -----------------------------
     inspector = CompositeIngestionInspector()  # basic poison + sensitive-data
-    # An injected provider may replace the permissive default.\n    # otherwise fall back to the OSS AllowAllPolicy. The injected value is a core
-    # ``PolicyProvider`` â€” the open-core boundary holds.
+    # An injected provider (e.g. the commercial CommercialPolicyProvider)
+    # replaces the permissive default when the ``policy_engine`` flag is on;
+    # otherwise fall back to the OSS AllowAllPolicy. The injected value is a core
+    # ``PolicyProvider`` — the open-core boundary holds.
     policy = policy if policy is not None else AllowAllPolicy()
     # An injected sink (e.g. the commercial durable audit sink) replaces the
     # local JSONL/null sink in cloud mode; otherwise fall back to the OSS
-    # defaults. The injected value is a core ``AuditSink`` â€” the boundary holds.
+    # defaults. The injected value is a core ``AuditSink`` — the boundary holds.
     if audit is not None:
         audit_sink: AuditSink = audit
     elif audit_path is not None:
@@ -213,6 +255,7 @@ def build_local_engine(
 def _build_local_model_loader(
     flags: FeatureFlags,
     *,
+    model_registry_path: Path,
     embedder: LocalEmbedder,
     reranker: HeuristicReranker,
     trust_model: DeterministicTrustModel,
@@ -233,7 +276,7 @@ def _build_local_model_loader(
     built with a minimal no-op runner that still performs no network I/O.
     """
 
-    registry = LocalFileModelRegistry()
+    registry = LocalFileModelRegistry(index_path=model_registry_path)
 
     try:
         from memoryguard_serving.local_runner import LocalInferenceRunner
@@ -282,4 +325,3 @@ class _NullInferenceRunner:
 
     def run(self, loaded: object, inputs: list[dict]) -> list[dict]:  # pragma: no cover
         return [dict(item) for item in inputs]
-

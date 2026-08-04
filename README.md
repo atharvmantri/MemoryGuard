@@ -35,9 +35,46 @@ AI coding agents forget project decisions between sessions. Humans end up re-exp
 - Redacts common secret-looking values before display, storage, and rendering.
 - Runs without a cloud service or required external LLM API.
 
-## 2-Minute Demo
+## 2-Minute Demo (one-line install)
 
-Clone, run the one-time alpha installer, then `memoryguard demo`:
+**Windows (PowerShell):**
+
+```powershell
+irm https://raw.githubusercontent.com/atharvmantri/MemoryGuard/main/scripts/install.ps1 | iex
+```
+
+**macOS / Linux:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/atharvmantri/MemoryGuard/main/scripts/install.sh | bash
+```
+
+After the one-line install finishes, run `memoryguard doctor` then
+`memoryguard demo`. The demo runs in a temporary project and proves
+transcript capture, pending approval, safe approval, context sync,
+supersession, and fake-secret non-leakage.
+
+Prerequisites: `git` and `uv` (Node/pnpm are **not** required for the CLI).
+The installer prints clear install instructions for either missing tool and
+exits non-zero rather than partially installing.
+
+**Uninstall:**
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\MemoryGuard\source\scripts\uninstall.ps1"
+
+# macOS / Linux
+bash ~/.local/share/memoryguard/source/scripts/uninstall.sh
+```
+
+Add `-RemoveSource` / `--remove-source` to also delete the cloned source dir.
+User project `.memoryguard/` stores are never touched.
+
+## Quickstart (manual / advanced)
+
+If you would rather work from a clone (e.g. to inspect the source while
+debugging), the per-repo install script is still supported:
 
 ```bash
 git clone https://github.com/atharvmantri/MemoryGuard.git
@@ -48,20 +85,7 @@ powershell -ExecutionPolicy Bypass -File scripts/install-alpha.ps1
 
 # macOS / Linux
 bash scripts/install-alpha.sh
-
-memoryguard doctor
-memoryguard demo
 ```
-
-The demo runs in a temporary project and proves transcript capture, pending approval, safe approval, context sync, supersession, and fake-secret non-leakage.
-
-## Quickstart
-
-There is no PyPI or npm package to install during alpha. The supported flow
-is clone + the one-time `scripts/install-alpha.{ps1,sh}` installer, which
-sets up a thin `memoryguard` wrapper on your `PATH` and runs `uv sync --dev`
-under the hood. Node/pnpm are only needed for the local dashboard and
-TypeScript SDK — not for the CLI.
 
 After the installer finishes:
 
@@ -71,6 +95,47 @@ memoryguard remember "This project uses Flask for the backend."
 memoryguard sync
 memoryguard status
 ```
+
+The per-repo installer (`scripts/install-alpha.{ps1,sh}`) does the same job
+as the one-line bootstrap: it verifies `uv`, runs `uv sync
+--all-packages --dev`, writes the `memoryguard` wrapper to your `PATH`,
+detects any pre-existing `memoryguard` files on `PATH` (e.g. a stale
+`memoryguard.exe` from a prior Python install) and warns about the
+collision. Pass `-RemoveShadowingCommands` / `--remove-shadowing-commands`
+to move the offending file out of the way automatically. Pass
+`-NoPathUpdate` / `--no-path-update` to skip the `PATH` writes entirely.
+
+### Troubleshooting PATH
+
+If `memoryguard` does not resolve in a new shell, check which one Windows or
+POSIX is finding first:
+
+```powershell
+# Windows PowerShell
+Get-Command memoryguard -All
+
+# cmd.exe
+where memoryguard
+```
+
+Expected: `%LOCALAPPDATA%\Programs\MemoryGuard\memoryguard.cmd` (or
+`memoryguard.ps1`).
+
+If a stale `memoryguard.exe` from a prior Python install (e.g.
+`C:\Users\<you>\AppData\Local\Programs\Python\Python312\Scripts\memoryguard.exe`)
+still wins on `PATH`, re-run the install with `-RemoveShadowingCommands`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:LOCALAPPDATA\MemoryGuard\source\scripts\install-alpha.ps1" -RemoveShadowingCommands
+```
+
+```bash
+bash ~/.local/share/memoryguard/source/scripts/install-alpha.sh --remove-shadowing-commands
+```
+
+The flag moves the offending file out of the way to
+`memoryguard.disabled-by-memoryguard` in the same directory, so the alpha
+wrapper is now first on `PATH`.
 
 ### Available after this update is pushed and verified
 
