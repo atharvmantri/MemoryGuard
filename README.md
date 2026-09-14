@@ -137,10 +137,10 @@ The flag moves the offending file out of the way to
 `memoryguard.disabled-by-memoryguard` in the same directory, so the alpha
 wrapper is now first on `PATH`.
 
-### Available after this update is pushed and verified
+### Verified public alpha one-line install
 
-Once this update is pushed to `main` on the public repo and the raw GitHub
-URLs below are verified to resolve, a one-line install will be available:
+The raw GitHub URLs below are live on `main` and were verified on 2026-09-14.
+Use them when you want the alpha wrapper directly:
 
 ```powershell
 # Windows (PowerShell)
@@ -152,9 +152,8 @@ irm https://raw.githubusercontent.com/atharvmantri/MemoryGuard/main/scripts/inst
 curl -fsSL https://raw.githubusercontent.com/atharvmantri/MemoryGuard/main/scripts/install-alpha.sh | bash
 ```
 
-Until those raw URLs are verified live from `raw.githubusercontent.com`,
-the one-liner is **not** the recommended quickstart. Use the clone + run
-local script flow above.
+The clone + run local script flow above remains available for contributors who
+want to inspect or modify the source before installing.
 
 ## Agent Capture Demo
 
