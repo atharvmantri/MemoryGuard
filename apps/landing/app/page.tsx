@@ -35,7 +35,7 @@ const features: {
   {
     kicker: "Sync",
     title: "One memory store. Many agent files.",
-    body: "Render approved project memory into AGENTS.md, CLAUDE.md, MEMORY.md, and Cursor rules.",
+    body: "Render approved project memory into AGENTS.md, CLAUDE.md, Copilot instructions, MEMORY.md, and Cursor rules.",
     icon: "⇄",
     wide: true,
   },
@@ -91,7 +91,7 @@ const compRows: {
   generic: CellKind;
   mg: CellKind;
 }[] = [
-  { capability: "Syncs AGENTS.md / CLAUDE.md / MEMORY.md / Cursor rules", manual: "partial", generic: "partial", mg: "yes" },
+  { capability: "Syncs AGENTS.md / CLAUDE.md / Copilot / MEMORY.md / Cursor rules", manual: "partial", generic: "partial", mg: "yes" },
   { capability: "Review-first transcript capture", manual: "no", generic: "partial", mg: "yes" },
   { capability: "Supersedes outdated project decisions", manual: "no", generic: "partial", mg: "yes" },
   { capability: "Secret-aware generated context", manual: "no", generic: "partial", mg: "yes" },
@@ -106,7 +106,7 @@ const workflow = [
   { step: "Sync", desc: "Write clean context into the files your tools already inspect.", cmd: "memoryguard sync" },
 ];
 
-const generatedFiles = ["AGENTS.md", "CLAUDE.md", "MEMORY.md", ".cursor/rules/memoryguard.mdc"];
+const generatedFiles = ["AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md", "MEMORY.md", ".cursor/rules/memoryguard.mdc"];
 
 /* ── Page ─────────────────────────────────────────────────── */
 
@@ -122,7 +122,7 @@ export default function HomePage() {
             MemoryGuard keeps your project&apos;s agent context files accurate
             across sessions. Capture decisions, review what matters, supersede
             outdated facts, and sync clean context into AGENTS.md, CLAUDE.md,
-            MEMORY.md, and Cursor rules.
+            .github/copilot-instructions.md, MEMORY.md, and Cursor rules.
           </p>
           <div className="hero-actions">
             <Button href={githubUrl} variant="primary">Star on GitHub</Button>
@@ -224,7 +224,7 @@ export default function HomePage() {
 [ok] uv                on PATH
 $ memoryguard demo
 Agent Capture demo passed.
-Extracted 10 candidates, approved 9, wrote 4 context files.`}
+Extracted 10 candidates, approved 9, wrote 5 context files.`}
             </Terminal>
           </div>
         </section>
@@ -306,13 +306,14 @@ function ProductMockup() {
           <div className="mockup-panel-title">Generated Context</div>
           <div className="gen-file">AGENTS.md</div>
           <div className="gen-file">CLAUDE.md</div>
+          <div className="gen-file">Copilot instructions</div>
           <div className="gen-file">MEMORY.md</div>
           <div className="gen-file">Cursor rules</div>
         </div>
         <div className="mockup-terminal">
           <span className="cmd">$ memoryguard capture approve --all</span><br />
           <span className="cmd">$ memoryguard sync</span><br />
-          <span className="ok">✓ wrote 4 context files</span>
+          <span className="ok">✓ wrote 5 context files</span>
         </div>
       </div>
     </div>

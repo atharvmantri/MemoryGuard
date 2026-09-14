@@ -4,7 +4,7 @@
 
 **Stop re-explaining your project to AI coding agents.**
 
-MemoryGuard is a local-first developer CLI that turns durable project facts into generated context files for coding agents. It helps keep `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`, and Cursor rules aligned with the current truth of your project, while redacting secret-looking values before they reach generated context.
+MemoryGuard is a local-first developer CLI that turns durable project facts into generated context files for coding agents. It helps keep `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `MEMORY.md`, and Cursor rules aligned with the current truth of your project, while redacting secret-looking values before they reach generated context.
 
 **[Visit the public alpha site and quickstart](https://atharvmantri.github.io/MemoryGuard/)**
 
@@ -218,6 +218,7 @@ MemoryGuard Context Sync writes managed blocks to:
 
 - `AGENTS.md`
 - `CLAUDE.md`
+- `.github/copilot-instructions.md`
 - `MEMORY.md`
 - `.cursor/rules/memoryguard.mdc`
 
@@ -245,7 +246,7 @@ MemoryGuard redacts common secret-looking values before displaying capture candi
 
 projectmem is stronger today for event-sourced memory, pre-commit warnings, cross-project memory, and judgment workflows.
 
-MemoryGuard has a different focus: context-file sync for `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`, and Cursor rules. MemoryGuard's wedge is current project truth, supersession of outdated decisions, and secret-safe generated context. Different focus, not fake superiority.
+MemoryGuard has a different focus: context-file sync for `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`, `MEMORY.md`, and Cursor rules. MemoryGuard's wedge is current project truth, supersession of outdated decisions, and secret-safe generated context. Different focus, not fake superiority.
 
 ## Roadmap
 

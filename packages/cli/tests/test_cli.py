@@ -349,6 +349,7 @@ def test_status_shows_project_health(tmp_path):
     assert "AGENTS.md" in result.stdout
     assert "CLAUDE.md" in result.stdout
     assert "MEMORY.md" in result.stdout
+    assert ".github/copilot-instructions.md" in result.stdout
     assert ".cursor/rules/memoryguard.mdc" in result.stdout
     assert "suggested next command" in out
     assert 'memoryguard remember "This project uses ..."' in result.stdout
@@ -785,8 +786,8 @@ def test_doctor_exit_zero_when_store_and_context_files_present(tmp_path):
     out = result.stdout
     # Store + context-files rows are explicit "pass" cells.
     assert "pass" in out
-    # The context-files row should report "all 4 present" once sync wrote them.
-    assert "all 4 present" in out
+    # The context-files row should report "all 5 present" once sync wrote them.
+    assert "all 5 present" in out
     # The friendly "all checks passed" verdict is rendered on a full pass.
     assert "all checks passed" in out.lower()
 

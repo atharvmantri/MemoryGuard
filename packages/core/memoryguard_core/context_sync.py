@@ -37,6 +37,7 @@ CONTEXT_FILES: tuple[str, ...] = (
     "AGENTS.md",
     "CLAUDE.md",
     "MEMORY.md",
+    ".github/copilot-instructions.md",
     ".cursor/rules/memoryguard.mdc",
 )
 

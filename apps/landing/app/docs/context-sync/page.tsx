@@ -17,6 +17,9 @@ export default function ContextSyncPage() {
             <code>CLAUDE.md</code>
           </li>
           <li>
+            <code>.github/copilot-instructions.md</code>
+          </li>
+          <li>
             <code>MEMORY.md</code>
           </li>
           <li>
@@ -80,6 +83,7 @@ memoryguard context watch --yes --once`}</CodeBlock>
         <p>
           Treat generated context as code-adjacent output. Review{" "}
           <code>AGENTS.md</code>, <code>CLAUDE.md</code>,{" "}
+          <code>.github/copilot-instructions.md</code>, <code>MEMORY.md</code>,{" "}
           <code>MEMORY.md</code>, and the Cursor rules before committing or
           sharing them.
         </p>
