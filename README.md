@@ -37,6 +37,14 @@ AI coding agents forget project decisions between sessions. Humans end up re-exp
 - Redacts common secret-looking values before display, storage, and rendering.
 - Runs without a cloud service or required external LLM API.
 
+## TypeScript SDK
+
+The monorepo includes a typed TypeScript REST client for applications that
+already have a MemoryGuard API. It supports memory CRUD, trust-aware queries,
+path ingestion, contradiction lookup, bearer authentication, and injected
+`fetch` transports for tests. See the [`@memoryguard/sdk` guide](./packages/sdk-ts/README.md)
+for build, test, and usage examples.
+
 ## 2-Minute Demo (one-line install)
 
 **Windows (PowerShell):**
