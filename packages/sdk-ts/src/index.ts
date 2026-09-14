@@ -14,10 +14,10 @@
  * The mapping between the two is performed by the request serialization /
  * response deserialization layer.
  *
- * Scaffold status (task 24.1): this module defines the full type surface and
- * method signatures. Method bodies are `TODO` stubs that throw
- * `Error("TODO: not implemented")`; the real REST client implementation
- * (fetch, serialization, error mapping) lands in task 24.2.
+ * The client uses the platform `fetch` API and keeps transport concerns small:
+ * request bodies are serialized to the REST API's snake_case wire format,
+ * response envelopes are accepted in either wrapped or bare form, and
+ * non-2xx responses become `MemoryGuardError` instances with their payload.
  *
  * Requirements: 12.1 (remote constructor targeting the REST API base URL with
  * an optional auth token), 12.2 (exposes add/get/query/ingestPath/correct/
@@ -456,6 +456,48 @@ export function deserializeContradiction(wire: ContradictionWire): Contradiction
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function unwrapObject<T>(data: unknown, key: string): T {
+  if (!isRecord(data)) {
+    throw new Error(`MemoryGuard API returned an invalid ${key} response`);
+  }
+  const wrapped = data[key];
+  if (isRecord(wrapped)) return wrapped as T;
+  for (const alternative of ["data", "result"]) {
+    if (isRecord(data[alternative])) {
+      return unwrapObject<T>(data[alternative], key);
+    }
+  }
+  return data as T;
+}
+
+function unwrapList<T>(data: unknown, key: string): T[] {
+  if (Array.isArray(data)) return data as T[];
+  if (isRecord(data)) {
+    for (const candidate of [key, "results", "items", "data"]) {
+      if (Array.isArray(data[candidate])) return data[candidate] as T[];
+    }
+  }
+  throw new Error(`MemoryGuard API returned an invalid ${key} response`);
+}
+
+function errorMessage(payload: unknown): string {
+  if (isRecord(payload)) {
+    for (const key of ["error", "detail", "message"]) {
+      if (payload[key] !== undefined) return String(payload[key]);
+    }
+  }
+  if (typeof payload === "string") return payload;
+  try {
+    return JSON.stringify(payload);
+  } catch {
+    return String(payload);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Client
 // ---------------------------------------------------------------------------
@@ -516,13 +558,53 @@ export class MemoryGuard {
     return new MemoryGuard(options);
   }
 
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: Record<string, unknown>,
+  ): Promise<T> {
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+    };
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    if (this.token) headers.Authorization = `Bearer ${this.token}`;
+
+    const init: RequestInit = { method, headers };
+    if (body !== undefined) init.body = JSON.stringify(body);
+
+    const response = await this.fetchImpl(`${this.baseUrl}${path}`, init);
+    const raw = await response.text();
+    let payload: unknown;
+    if (raw) {
+      try {
+        payload = JSON.parse(raw);
+      } catch {
+        payload = raw;
+      }
+    }
+
+    if (!response.ok) {
+      throw new MemoryGuardError(
+        response.status,
+        errorMessage(payload),
+        payload,
+      );
+    }
+    return payload as T;
+  }
+
   /**
    * Create a memory with the supplied provenance and lifecycle metadata.
    *
    * Maps to `POST /v1/memories` (`CreateMemoryRequest` -> `MemoryResponse`).
    */
   async add(request: AddMemoryRequest): Promise<Memory> {
-    throw new Error("TODO: not implemented");
+    const payload = await this.request<unknown>(
+      "POST",
+      "/v1/memories",
+      serializeAddRequest(request) as unknown as Record<string, unknown>,
+    );
+    return deserializeMemory(unwrapObject<MemoryWire>(payload, "memory"));
   }
 
   /**
@@ -532,7 +614,11 @@ export class MemoryGuard {
    * memory surfaces as a {@link MemoryGuardError} with status `404`.
    */
   async get(memoryId: string): Promise<Memory> {
-    throw new Error("TODO: not implemented");
+    const payload = await this.request<unknown>(
+      "GET",
+      `/v1/memories/${encodeURIComponent(memoryId)}`,
+    );
+    return deserializeMemory(unwrapObject<MemoryWire>(payload, "memory"));
   }
 
   /**
@@ -543,7 +629,14 @@ export class MemoryGuard {
    * `sourceRef`, and `reasons` (Requirement 12.3).
    */
   async query(request: QueryRequest): Promise<RetrievedMemory[]> {
-    throw new Error("TODO: not implemented");
+    const payload = await this.request<unknown>(
+      "POST",
+      "/v1/query",
+      serializeQueryRequest(request) as unknown as Record<string, unknown>,
+    );
+    return deserializeQueryResponse(
+      unwrapObject<QueryResponseWire>(payload, "query"),
+    ).results;
   }
 
   /**
@@ -553,7 +646,14 @@ export class MemoryGuard {
    * `IngestPathResponse`).
    */
   async ingestPath(request: IngestPathRequest): Promise<IngestPathResult> {
-    throw new Error("TODO: not implemented");
+    const payload = await this.request<unknown>(
+      "POST",
+      "/v1/ingest/path",
+      serializeIngestPathRequest(request) as unknown as Record<string, unknown>,
+    );
+    return deserializeIngestPathResult(
+      unwrapObject<IngestPathResponseWire>(payload, "result"),
+    );
   }
 
   /**
@@ -563,7 +663,12 @@ export class MemoryGuard {
    * `MemoryResponse`). The prior record becomes `corrected`.
    */
   async correct(memoryId: string, content: string): Promise<Memory> {
-    throw new Error("TODO: not implemented");
+    const payload = await this.request<unknown>(
+      "PATCH",
+      `/v1/memories/${encodeURIComponent(memoryId)}`,
+      { content },
+    );
+    return deserializeMemory(unwrapObject<MemoryWire>(payload, "memory"));
   }
 
   /**
@@ -572,7 +677,10 @@ export class MemoryGuard {
    * Maps to `DELETE /v1/memories/{memory_id}`.
    */
   async delete(memoryId: string): Promise<void> {
-    throw new Error("TODO: not implemented");
+    await this.request<unknown>(
+      "DELETE",
+      `/v1/memories/${encodeURIComponent(memoryId)}`,
+    );
   }
 
   /**
@@ -582,7 +690,13 @@ export class MemoryGuard {
    * `ContradictionResponse[]`).
    */
   async contradictions(memoryId: string): Promise<Contradiction[]> {
-    throw new Error("TODO: not implemented");
+    const payload = await this.request<unknown>(
+      "GET",
+      `/v1/memories/${encodeURIComponent(memoryId)}/contradictions`,
+    );
+    return unwrapList<ContradictionWire>(payload, "contradictions").map(
+      deserializeContradiction,
+    );
   }
 }
 
