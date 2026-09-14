@@ -42,6 +42,30 @@ def test_context_generation_uses_memories_and_repo_metadata(tmp_path):
     assert "Package manager: pnpm" in agents.proposed
 
 
+def test_context_generation_includes_copilot_repository_instructions(tmp_path):
+    engine = _engine(tmp_path)
+    engine.create_memory(
+        content="Use focused tests for feature changes.",
+        source_type=SourceType.USER,
+        source_ref="user://qa",
+        scope=Scope.PROJECT,
+        scope_ref="demo",
+    )
+
+    plan = build_context_sync_plan(tmp_path, engine.store)
+    copilot = next(
+        item for item in plan.files if item.path == ".github/copilot-instructions.md"
+    )
+
+    assert "Use focused tests for feature changes." in copilot.proposed
+    write_pending_context_plan(plan)
+    written, paths = approve_context_sync(tmp_path)
+
+    assert written == 5
+    assert ".github/copilot-instructions.md" in paths
+    assert (tmp_path / ".github/copilot-instructions.md").is_file()
+
+
 def test_context_generation_redacts_secrets(tmp_path):
     engine = _engine(tmp_path)
     engine.create_memory(

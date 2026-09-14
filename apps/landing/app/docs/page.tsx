@@ -16,7 +16,7 @@ const cards = [
   [
     "/docs/context-sync",
     "Context Sync",
-    "Render approved project memory into AGENTS.md, CLAUDE.md, MEMORY.md, and Cursor rules.",
+    "Render approved project memory into AGENTS.md, CLAUDE.md, Copilot instructions, MEMORY.md, and Cursor rules.",
   ],
   [
     "/docs/security",

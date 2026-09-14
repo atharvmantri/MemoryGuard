@@ -31,7 +31,8 @@ export default function SecurityPage() {
           MemoryGuard attempts to detect and omit secret-looking content
           before rendering generated context. This is a guardrail, not a
           guarantee. Review <code>AGENTS.md</code>, <code>CLAUDE.md</code>,{" "}
-          <code>MEMORY.md</code>, and the Cursor rules before publishing.
+          <code>.github/copilot-instructions.md</code>, <code>MEMORY.md</code>, and
+          the Cursor rules before publishing.
         </p>
 
         <h2>Transcript hygiene</h2>
