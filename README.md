@@ -189,6 +189,13 @@ Projects can run the read-only install and store check in CI with the included
 composite action. See [the GitHub Actions guide](docs/github-actions.md) for a
 minimal workflow and the optional strict mode.
 
+## Questions and feedback
+
+Use [GitHub Discussions](https://github.com/atharvmantri/MemoryGuard/discussions)
+for questions, workflow ideas, and public alpha feedback. Please use the
+[issue tracker](https://github.com/atharvmantri/MemoryGuard/issues) for
+reproducible bugs and security reports.
+
 ## Commands
 
 ```bash
