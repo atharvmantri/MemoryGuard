@@ -6,7 +6,7 @@ const publicAssetPath =
   process.env.MEMORYGUARD_GITHUB_PAGES === "true" ? "/MemoryGuard" : "";
 const licenseUrl = `${githubUrl}/blob/main/LICENSE`;
 const codeOfConductUrl = `${githubUrl}/blob/main/CODE_OF_CONDUCT.md`;
-const netlifyUrl = "https://www.netlify.com/";
+const pagesUrl = "https://pages.github.com/";
 
 const docsLinks = [
   ["/docs", "Overview"],
@@ -66,7 +66,7 @@ export function Footer() {
           <Link href="/docs/quickstart">Quickstart</Link>
           <Link href="/docs/security">Security</Link>
           <a href={codeOfConductUrl}>Code of Conduct</a>
-          <a href={netlifyUrl}>This site is powered by Netlify</a>
+          <a href={pagesUrl}>Published with GitHub Pages</a>
         </div>
       </div>
     </footer>
