@@ -176,6 +176,12 @@ powershell -ExecutionPolicy Bypass -File examples\agent-capture-demo\run-demo.ps
 bash examples/agent-capture-demo/run-demo.sh
 ```
 
+## GitHub Actions
+
+Projects can run the read-only install and store check in CI with the included
+composite action. See [the GitHub Actions guide](docs/github-actions.md) for a
+minimal workflow and the optional strict mode.
+
 ## Commands
 
 ```bash

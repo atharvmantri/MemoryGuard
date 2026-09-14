@@ -1,0 +1,40 @@
+name: MemoryGuard
+description: Run the local-first MemoryGuard doctor check for a project
+author: Atharv Mantri
+
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  project-path:
+    description: Project directory to inspect, relative to the GitHub workspace
+    required: false
+    default: .
+  strict:
+    description: Fail when doctor reports warnings, not only real errors
+    required: false
+    default: false
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+
+    - name: Run MemoryGuard doctor
+      shell: bash
+      env:
+        MEMORYGUARD_PROJECT_PATH: ${{ inputs.project-path }}
+        MEMORYGUARD_STRICT: ${{ inputs.strict }}
+      run: |
+        set -euo pipefail
+
+        args=(--store "$MEMORYGUARD_PROJECT_PATH" doctor)
+        if [[ "$MEMORYGUARD_STRICT" == "true" ]]; then
+          args+=(--strict)
+        fi
+
+        uv run --project "$GITHUB_ACTION_PATH" memoryguard "${args[@]}"
