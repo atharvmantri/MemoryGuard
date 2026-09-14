@@ -2,8 +2,15 @@ import type { Metadata } from "next";
 
 import "./globals.css";
 
+const publicAssetPath =
+  process.env.MEMORYGUARD_GITHUB_PAGES === "true" ? "/MemoryGuard" : "";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://memoryguard.atharv.me"),
+  metadataBase: new URL(
+    process.env.MEMORYGUARD_GITHUB_PAGES === "true"
+      ? "https://atharvmantri.github.io/MemoryGuard"
+      : "https://memoryguard.atharv.me",
+  ),
   title: {
     default: "MemoryGuard",
     template: "%s | MemoryGuard",
@@ -12,10 +19,19 @@ export const metadata: Metadata = {
     "Keep your project's agent context files accurate, reviewed, and safe. MemoryGuard is a local-first, open-source alpha.",
   icons: {
     icon: [
-      { url: "/MemoryGuard_Favicon.ico", sizes: "any" },
-      { url: "/MemoryGuard_Icon_32.png", type: "image/png", sizes: "32x32" },
+      { url: `${publicAssetPath}/MemoryGuard_Favicon.ico`, sizes: "any" },
+      {
+        url: `${publicAssetPath}/MemoryGuard_Icon_32.png`,
+        type: "image/png",
+        sizes: "32x32",
+      },
     ],
-    apple: [{ url: "/MemoryGuard_Icon_256.png", sizes: "256x256" }],
+    apple: [
+      {
+        url: `${publicAssetPath}/MemoryGuard_Icon_256.png`,
+        sizes: "256x256",
+      },
+    ],
   },
   openGraph: {
     title: "MemoryGuard — Stop re-teaching your codebase to AI.",

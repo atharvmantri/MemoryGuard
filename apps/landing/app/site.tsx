@@ -2,6 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 
 const githubUrl = "https://github.com/atharvmantri/MemoryGuard";
+const publicAssetPath =
+  process.env.MEMORYGUARD_GITHUB_PAGES === "true" ? "/MemoryGuard" : "";
 const licenseUrl = `${githubUrl}/blob/main/LICENSE`;
 const codeOfConductUrl = `${githubUrl}/blob/main/CODE_OF_CONDUCT.md`;
 const netlifyUrl = "https://www.netlify.com/";
@@ -21,7 +23,7 @@ export function SiteFrame({ children }: { children: React.ReactNode }) {
         <nav className="nav" aria-label="Main navigation">
           <Link className="brand" href="/" aria-label="MemoryGuard home">
             <Image
-              src="/MemoryGuard_Icon_256.png"
+              src={`${publicAssetPath}/MemoryGuard_Icon_256.png`}
               width={64}
               height={64}
               alt=""
