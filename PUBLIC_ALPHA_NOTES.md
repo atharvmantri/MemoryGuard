@@ -2,6 +2,11 @@
 
 MemoryGuard public alpha is early software.
 
+The static landing site can be deployed at the repository's GitHub Pages URL
+with `.github/workflows/pages.yml`. The workflow is intended for this public
+repository, uses the static Next export, and sets the `/MemoryGuard` project
+site base path.
+
 - Local-first by default: project state is stored under `.memoryguard/` in your repo.
 - No external LLM API is required for the core workflow.
 - Do not trust generated context blindly.

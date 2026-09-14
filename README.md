@@ -54,6 +54,11 @@ After the one-line install finishes, run `memoryguard doctor` then
 transcript capture, pending approval, safe approval, context sync,
 supersession, and fake-secret non-leakage.
 
+Before installing, you can verify the public alpha from an isolated temporary
+checkout with `powershell -ExecutionPolicy Bypass -File
+scripts/verify-public-alpha.ps1`. The verifier prints the exact commit tested
+and does not modify your `PATH` or project files.
+
 Prerequisites: `git` and `uv` (Node/pnpm are **not** required for the CLI).
 The installer prints clear install instructions for either missing tool and
 exits non-zero rather than partially installing.
