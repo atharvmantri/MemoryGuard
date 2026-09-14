@@ -37,4 +37,6 @@ runs:
           args+=(--strict)
         fi
 
-        uv run --project "$GITHUB_ACTION_PATH" memoryguard "${args[@]}"
+        # Fail if the action's committed dependency lock is stale instead of
+        # resolving a different graph during a user's CI run.
+        uv run --locked --project "$GITHUB_ACTION_PATH" memoryguard "${args[@]}"
