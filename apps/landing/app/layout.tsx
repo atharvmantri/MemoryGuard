@@ -2,15 +2,14 @@ import type { Metadata } from "next";
 
 import "./globals.css";
 
-const publicAssetPath =
-  process.env.MEMORYGUARD_GITHUB_PAGES === "true" ? "/MemoryGuard" : "";
+const isGithubPages = process.env.MEMORYGUARD_GITHUB_PAGES === "true";
+const publicAssetPath = isGithubPages ? "/MemoryGuard" : "";
+const publicSiteUrl = isGithubPages
+  ? "https://atharvmantri.github.io/MemoryGuard"
+  : "https://memoryguard.atharv.me";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.MEMORYGUARD_GITHUB_PAGES === "true"
-      ? "https://atharvmantri.github.io/MemoryGuard"
-      : "https://memoryguard.atharv.me",
-  ),
+  metadataBase: new URL(publicSiteUrl),
   title: {
     default: "MemoryGuard",
     template: "%s | MemoryGuard",
@@ -37,7 +36,7 @@ export const metadata: Metadata = {
     title: "MemoryGuard — Stop re-teaching your codebase to AI.",
     description:
       "MemoryGuard keeps your project's agent context files accurate across sessions. Open-source alpha, runs locally from source.",
-    url: "https://memoryguard.atharv.me",
+    url: publicSiteUrl,
     siteName: "MemoryGuard",
     type: "website",
   },
