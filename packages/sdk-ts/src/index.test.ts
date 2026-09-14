@@ -29,6 +29,9 @@ import {
   Scope,
   Sensitivity,
   MemoryStatus,
+  MemoryGuard,
+  MemoryGuardError,
+  type FetchLike,
   // request models + serializers
   AddMemoryRequest,
   QueryRequest,
@@ -430,5 +433,170 @@ describe("serialization round-trip — concrete example", () => {
     expect(result.memory.trustScore).toBe(0.82);
     expect(result.reasons).toEqual(["high source authority", "recent"]);
     expect(response.queryId).toBe("22222222-2222-4222-8222-222222222222");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Remote client transport
+// ---------------------------------------------------------------------------
+
+describe("remote client", () => {
+  const memoryWire: MemoryWire = {
+    memory_id: "11111111-1111-4111-8111-111111111111",
+    content: "billing-svc uses PostgreSQL 15",
+    source_type: SourceType.File,
+    source_ref: "repo://billing-svc/README.md@c4a1",
+    scope: Scope.Repo,
+    scope_ref: "billing-svc",
+    created_at: "2024-01-01T00:00:00.000Z",
+    updated_at: "2024-01-01T00:00:00.000Z",
+    expires_at: null,
+    trust_score: 0.82,
+    sensitivity: Sensitivity.Internal,
+    status: MemoryStatus.Active,
+    contradicts: [],
+    tags: ["db"],
+  };
+
+  function jsonResponse(payload: unknown, status = 200): Response {
+    return new Response(
+      payload === undefined ? null : JSON.stringify(payload),
+      { status, headers: { "content-type": "application/json" } },
+    );
+  }
+
+  it("serializes requests, maps every endpoint, and sends bearer auth", async () => {
+    const calls: Array<{ input: string; init?: RequestInit }> = [];
+    const responses = [
+      jsonResponse({ memory: memoryWire }),
+      jsonResponse({ memory: memoryWire }),
+      jsonResponse({
+        query: {
+          results: [
+            {
+              memory: memoryWire,
+              relevance: 0.9,
+              final_rank: 0.88,
+              reasons: ["recent"],
+            },
+          ],
+          query_id: "22222222-2222-4222-8222-222222222222",
+        },
+      }),
+      jsonResponse({ result: { created: 1, memory_ids: [memoryWire.memory_id] } }),
+      jsonResponse({ data: { memory: memoryWire } }),
+      jsonResponse(undefined, 204),
+      jsonResponse({
+        contradictions: [
+          {
+            memory_id: "33333333-3333-4333-8333-333333333333",
+            source_ref: "repo://billing-svc/old.md",
+            status: MemoryStatus.Superseded,
+            reason: "superseded decision",
+            confidence: 0.91,
+          },
+        ],
+      }),
+    ];
+    const fetchImpl: FetchLike = async (input, init) => {
+      calls.push({ input, init });
+      return responses.shift() ?? jsonResponse({ error: "unexpected call" }, 500);
+    };
+
+    const client = MemoryGuard.remote({
+      baseUrl: "https://api.example.test///",
+      token: "test-token",
+      fetch: fetchImpl,
+    });
+
+    const added = await client.add({
+      content: memoryWire.content,
+      sourceType: SourceType.File,
+      sourceRef: memoryWire.source_ref,
+      scope: Scope.Repo,
+      scopeRef: memoryWire.scope_ref,
+      sensitivity: Sensitivity.Internal,
+      tags: ["db"],
+    });
+    expect(added.memoryId).toBe(memoryWire.memory_id);
+    expect(calls[0].input).toBe("https://api.example.test/v1/memories");
+    expect(calls[0].init?.method).toBe("POST");
+    expect(calls[0].init?.headers).toEqual({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: "Bearer test-token",
+    });
+    expect(JSON.parse(calls[0].init?.body as string)).toEqual({
+      content: memoryWire.content,
+      source_type: SourceType.File,
+      source_ref: memoryWire.source_ref,
+      scope: Scope.Repo,
+      scope_ref: memoryWire.scope_ref,
+      sensitivity: Sensitivity.Internal,
+      tags: ["db"],
+    });
+
+    expect((await client.get("m/1")).content).toBe(memoryWire.content);
+    expect(calls[1].input).toBe("https://api.example.test/v1/memories/m%2F1");
+
+    const results = await client.query({
+      text: "which database?",
+      scope: Scope.Repo,
+      scopeRef: "billing-svc",
+      minTrust: 0.5,
+      limit: 5,
+    });
+    expect(results[0].memory.trustScore).toBe(0.82);
+    expect(results[0].reasons).toEqual(["recent"]);
+    expect(JSON.parse(calls[2].init?.body as string)).toEqual({
+      text: "which database?",
+      scope: Scope.Repo,
+      scope_ref: "billing-svc",
+      min_trust: 0.5,
+      limit: 5,
+    });
+
+    await expect(
+      client.ingestPath({ path: "./docs", scope: Scope.Repo }),
+    ).resolves.toEqual({ created: 1, memoryIds: [memoryWire.memory_id] });
+    await expect(client.correct("m/1", "new content")).resolves.toMatchObject({
+      memoryId: memoryWire.memory_id,
+    });
+    expect(JSON.parse(calls[4].init?.body as string)).toEqual({
+      content: "new content",
+    });
+    await expect(client.delete("m/1")).resolves.toBeUndefined();
+    expect(calls[5].init?.headers).toEqual({
+      Accept: "application/json",
+      Authorization: "Bearer test-token",
+    });
+
+    await expect(client.contradictions(memoryWire.memory_id)).resolves.toEqual([
+      {
+        memoryId: "33333333-3333-4333-8333-333333333333",
+        sourceRef: "repo://billing-svc/old.md",
+        status: MemoryStatus.Superseded,
+        reason: "superseded decision",
+        confidence: 0.91,
+      },
+    ]);
+  });
+
+  it("maps non-2xx JSON responses to MemoryGuardError", async () => {
+    const fetchImpl: FetchLike = async () =>
+      jsonResponse({ detail: "memory does not exist" }, 404);
+    const client = MemoryGuard.remote({
+      baseUrl: "https://api.example.test",
+      fetch: fetchImpl,
+    });
+
+    await expect(client.get("missing")).rejects.toEqual(
+      expect.objectContaining({
+        name: "MemoryGuardError",
+        status: 404,
+        message: "memory does not exist",
+        body: { detail: "memory does not exist" },
+      } satisfies Partial<MemoryGuardError>),
+    );
   });
 });
