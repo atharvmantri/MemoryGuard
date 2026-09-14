@@ -42,8 +42,10 @@ enable strict mode:
 ```
 
 For production workflows, pin `uses` to a reviewed commit instead of `main`.
-The action uses `uv` to run the source in the action checkout; it does not
-publish or install a package from PyPI.
+The action uses `uv` and the repository's committed lockfile to run the source
+in the action checkout; it does not publish or install a package from PyPI. If
+the lockfile is stale, the action fails rather than silently resolving a new
+dependency graph in CI.
 
 ## What the action does
 
