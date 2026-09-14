@@ -359,6 +359,32 @@ describe("response deserialization preserves all fields from the wire", () => {
     );
   });
 
+  it("deserializeIngestPathResult accepts the legacy created-memory list shape", () => {
+    const result = deserializeIngestPathResult({ memories: [
+      {
+        memory_id: "11111111-1111-4111-8111-111111111111",
+        content: "c",
+        source_type: SourceType.File,
+        source_ref: "file://README.md",
+        scope: Scope.Repo,
+        scope_ref: "repo",
+        created_at: "2024-01-01T00:00:00.000Z",
+        updated_at: "2024-01-01T00:00:00.000Z",
+        expires_at: null,
+        trust_score: 0.8,
+        sensitivity: Sensitivity.Internal,
+        status: MemoryStatus.Active,
+        contradicts: [],
+        tags: [],
+      },
+    ] });
+
+    expect(result).toEqual({
+      created: 1,
+      memoryIds: ["11111111-1111-4111-8111-111111111111"],
+    });
+  });
+
   it("deserializeContradiction preserves memoryId, sourceRef, status, reason, confidence", () => {
     fc.assert(
       fc.property(contradictionWireArb, (wire) => {

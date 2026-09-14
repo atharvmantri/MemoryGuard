@@ -289,8 +289,10 @@ export interface QueryResponseWire {
 
 /** Wire shape of `IngestPathResponse` (snake_case). */
 export interface IngestPathResponseWire {
-  created: number;
-  memory_ids: string[];
+  created?: number;
+  memory_ids?: string[];
+  /** Legacy OSS API shape: the created records themselves. */
+  memories?: MemoryWire[];
 }
 
 /** Wire shape of `ContradictionResponse` (snake_case). */
@@ -436,9 +438,11 @@ export function deserializeQueryResponse(wire: QueryResponseWire): QueryResponse
 export function deserializeIngestPathResult(
   wire: IngestPathResponseWire,
 ): IngestPathResult {
+  const memoryIds =
+    wire.memory_ids ?? wire.memories?.map((memory) => memory.memory_id) ?? [];
   return {
-    created: wire.created,
-    memoryIds: wire.memory_ids ?? [],
+    created: wire.created ?? wire.memories?.length ?? memoryIds.length,
+    memoryIds,
   };
 }
 
@@ -651,9 +655,10 @@ export class MemoryGuard {
       "/v1/ingest/path",
       serializeIngestPathRequest(request) as unknown as Record<string, unknown>,
     );
-    return deserializeIngestPathResult(
-      unwrapObject<IngestPathResponseWire>(payload, "result"),
-    );
+    const response = Array.isArray(payload)
+      ? { memories: payload as MemoryWire[] }
+      : unwrapObject<IngestPathResponseWire>(payload, "result");
+    return deserializeIngestPathResult(response);
   }
 
   /**
