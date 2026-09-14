@@ -6,6 +6,8 @@
 
 MemoryGuard is a local-first developer CLI that turns durable project facts into generated context files for coding agents. It helps keep `AGENTS.md`, `CLAUDE.md`, `MEMORY.md`, and Cursor rules aligned with the current truth of your project, while redacting secret-looking values before they reach generated context.
 
+**[Visit the public alpha site and quickstart](https://atharvmantri.github.io/MemoryGuard/)**
+
 ## Before / After
 
 Before:

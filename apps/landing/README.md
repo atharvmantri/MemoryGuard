@@ -22,11 +22,12 @@ The site is configured with Next.js static export. Build output is written to
 
 ## Deploy
 
-Deploy the static `out` directory to any static host that supports custom
-domains:
+The public deployment is currently available at:
 
-- Current domain: `memoryguard.atharv.me`
-- Future domain: `memoryguard.dev`
+- https://atharvmantri.github.io/MemoryGuard/
+
+The static `out` directory can also be deployed to any static host that
+supports custom domains:
 
 Recommended setup:
 
